@@ -51,6 +51,14 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             onSpeakDone = {
                 speaking = false
                 if (activated) {
+                    // After activation prompt, wait for command; after command reply, return to wake listening
+                    if (_uiState.value.state == AssistantState.SPEAKING ||
+                        _uiState.value.state == AssistantState.ACTIVATED ||
+                        _uiState.value.state == AssistantState.PROCESSING
+                    ) {
+                        // If we just spoke activation, stay in command mode briefly
+                        // handled by activate() / handleCommand()
+                    }
                     resumeAfterSpeech()
                 } else {
                     setIdleWaitingWake(_uiState.value.language)
@@ -81,6 +89,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun runTestCommand(command: AssistantCommand) {
         viewModelScope.launch {
+            // Simulate hearing the phrase
             val heard = when (command) {
                 is AssistantCommand.TellTime -> if (command.language == AppLanguage.PERSIAN) "ساعت چنده؟" else "What time is it?"
                 is AssistantCommand.Weather -> if (command.language == AppLanguage.PERSIAN) "هوا چطوره؟" else "What's the weather?"
@@ -88,19 +97,24 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 is AssistantCommand.LightOff -> if (command.language == AppLanguage.PERSIAN) "چراغ رو خاموش کن" else "Turn off the light"
                 is AssistantCommand.Unknown -> command.raw
             }
-            val lang = when (command) {
-                is AssistantCommand.TellTime -> command.language
-                is AssistantCommand.Weather -> command.language
-                is AssistantCommand.LightOn -> command.language
-                is AssistantCommand.LightOff -> command.language
-                is AssistantCommand.Unknown -> command.language
-            }
             _uiState.update {
                 it.copy(
-                    language = lang,
+                    language = when (command) {
+                        is AssistantCommand.TellTime -> command.language
+                        is AssistantCommand.Weather -> command.language
+                        is AssistantCommand.LightOn -> command.language
+                        is AssistantCommand.LightOff -> command.language
+                        is AssistantCommand.Unknown -> command.language
+                    },
                     lastHeard = heard,
                     state = AssistantState.PROCESSING,
-                    statusText = statusFor(AssistantState.PROCESSING, lang)
+                    statusText = statusFor(AssistantState.PROCESSING, when (command) {
+                        is AssistantCommand.TellTime -> command.language
+                        is AssistantCommand.Weather -> command.language
+                        is AssistantCommand.LightOn -> command.language
+                        is AssistantCommand.LightOff -> command.language
+                        is AssistantCommand.Unknown -> command.language
+                    })
                 )
             }
             delay(250)
@@ -156,7 +170,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     _uiState.update { it.copy(errorMessage = message) }
                 }
             },
-            onReady = {},
+            onReady = {
+                // no-op
+            },
             onRmsChanged = { rms ->
                 _uiState.update { it.copy(rmsLevel = rms.coerceIn(0f, 10f) / 10f) }
             }
@@ -178,8 +194,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
         val prompt = ResponseBuilder.activationPrompt(language)
         _uiState.update { it.copy(lastReply = prompt) }
+        // Briefly pause recognition while TTS speaks
         speechRecognizer?.stop()
         tts?.speak(prompt, language)
+        // After speak done, resumeAfterSpeech will start command listening
         commandTimeoutJob = viewModelScope.launch {
             delay(12_000)
             if (activated) {
@@ -192,6 +210,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun resumeAfterSpeech() {
         if (!activated) return
+        // Enter command listening after activation TTS
         _uiState.update {
             it.copy(
                 state = AssistantState.LISTENING_COMMAND,
@@ -208,23 +227,32 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun handleCommandText(text: String) {
+        // Ignore if still contains only wake word
         if (CommandParser.containsWakeWord(text) && text.trim().split(" ").size <= 3) {
             return
         }
         commandTimeoutJob?.cancel()
         val command = CommandParser.parse(text)
-        val lang = when (command) {
-            is AssistantCommand.TellTime -> command.language
-            is AssistantCommand.Weather -> command.language
-            is AssistantCommand.LightOn -> command.language
-            is AssistantCommand.LightOff -> command.language
-            is AssistantCommand.Unknown -> command.language
-        }
         _uiState.update {
             it.copy(
-                language = lang,
+                language = when (command) {
+                    is AssistantCommand.TellTime -> command.language
+                    is AssistantCommand.Weather -> command.language
+                    is AssistantCommand.LightOn -> command.language
+                    is AssistantCommand.LightOff -> command.language
+                    is AssistantCommand.Unknown -> command.language
+                },
                 state = AssistantState.PROCESSING,
-                statusText = statusFor(AssistantState.PROCESSING, lang),
+                statusText = statusFor(
+                    AssistantState.PROCESSING,
+                    when (command) {
+                        is AssistantCommand.TellTime -> command.language
+                        is AssistantCommand.Weather -> command.language
+                        is AssistantCommand.LightOn -> command.language
+                        is AssistantCommand.LightOff -> command.language
+                        is AssistantCommand.Unknown -> command.language
+                    }
+                ),
                 lastHeard = text
             )
         }
@@ -255,8 +283,21 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 statusText = reply
             )
         }
-        activated = false
-        tts?.speak(reply, language)
+        if (fromVoice) {
+            activated = false
+            tts?.speak(reply, language)
+            // After TTS done, onSpeakDone restarts wake listening because activated=false
+        } else {
+            tts?.speak(reply, language)
+            viewModelScope.launch {
+                delay(50)
+                // keep wake listening for further voice use
+                if (_uiState.value.permissionGranted && speechRecognizer != null) {
+                    // ensure continuous wake listening still runs under test mode
+                    activated = false
+                }
+            }
+        }
     }
 
     private fun setIdleWaitingWake(language: AppLanguage) {
