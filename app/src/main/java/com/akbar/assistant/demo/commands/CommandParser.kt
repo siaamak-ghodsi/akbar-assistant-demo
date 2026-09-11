@@ -27,7 +27,7 @@ object CommandParser {
             .replace('ي', 'ی')
             .replace('ك', 'ک')
             .replace('ۀ', 'ه')
-            .replace('‌', ' ') // ZWNJ
+            .replace('‌', ' ')
             .replace(Regex("[؟?!,.،؛:\"']"), " ")
             .replace(Regex("\\s+"), " ")
             .trim()
@@ -36,14 +36,12 @@ object CommandParser {
     fun containsWakeWord(text: String): Boolean {
         val n = normalize(text)
         val fa = listOf(
-            "هی اکبر", "هی اکبر", "هی اگبر", "هی اقبر", "هی اکبر",
-            "های اکبر", "هی، اکبر", "سلام اکبر", "اکبر جان",
-            "هی akbar", "hey اکبر"
+            "هی اکبر", "هی اگبر", "هی اقبر", "های اکبر", "هی، اکبر",
+            "سلام اکبر", "اکبر جان", "هی akbar", "hey اکبر"
         )
         val en = listOf(
             "hey akbar", "hi akbar", "hay akbar", "hey, akbar",
-            "hey akber", "hey aqbar", "okay akbar", "ok akbar",
-            "hey akbaar"
+            "hey akber", "hey aqbar", "okay akbar", "ok akbar", "hey akbaar"
         )
         return fa.any { n.contains(it) } || en.any { n.contains(it) }
     }
@@ -76,19 +74,23 @@ object CommandParser {
 
     private fun isTime(n: String, language: AppLanguage): Boolean {
         return if (language == AppLanguage.PERSIAN) {
-            n.contains("ساعت") || n.contains("زمان") ||
-                n.contains("چند است") || n.contains("ساعت چند")
+            n.contains("ساعت") || n.contains("زمان") || n == "ساعت" ||
+                n.contains("چند است") || n.contains("ساعت چند") ||
+                n.contains("ساعت چنده") || n.contains("چه ساعتی")
         } else {
-            n.contains("time") || n.contains("clock")
+            n.contains("time") || n.contains("clock") || n == "time" ||
+                n.contains("what time")
         }
     }
 
     private fun isWeather(n: String, language: AppLanguage): Boolean {
         return if (language == AppLanguage.PERSIAN) {
             n.contains("هوا") || n.contains("آب و هوا") || n.contains("اب و هوا") ||
-                n.contains("آب‌وهوا") || n.contains("دما")
+                n.contains("آب‌وهوا") || n.contains("دما") ||
+                n.contains("چند درجه") || n.contains("هوا چطور") || n.contains("هوا چطوره")
         } else {
-            n.contains("weather") || n.contains("temperature") || n.contains("forecast")
+            n.contains("weather") || n.contains("temperature") || n.contains("forecast") ||
+                n.contains("how hot") || n.contains("how's the weather")
         }
     }
 
@@ -124,7 +126,7 @@ object CommandParser {
 object ResponseBuilder {
 
     fun activationPrompt(language: AppLanguage): String {
-        return if (language == AppLanguage.PERSIAN) "بله، بفرمایید" else "Yes, I'm listening"
+        return if (language == AppLanguage.PERSIAN) "بله، بفرمایید" else "Yes?"
     }
 
     fun forCommand(command: AssistantCommand): String {
@@ -137,9 +139,9 @@ object ResponseBuilder {
                 if (command.language == AppLanguage.PERSIAN) "چراغ‌قوه خاموش شد" else "Flashlight is off"
             is AssistantCommand.Unknown ->
                 if (command.language == AppLanguage.PERSIAN) {
-                    "متوجه نشدم. بگو ساعت، هوا، یا چراغ‌قوه."
+                    "متوجه نشدم. ساعت، هوا، یا چراغ‌قوه؟"
                 } else {
-                    "I didn't catch that. Ask for time, weather, or flashlight."
+                    "I didn't catch that. Time, weather, or flashlight?"
                 }
         }
     }
