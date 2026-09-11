@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
@@ -18,12 +19,22 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: AssistantViewModel by viewModels()
 
-    private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        val mic = result[Manifest.permission.RECORD_AUDIO] == true
-        val camera = result[Manifest.permission.CAMERA] == true
-        viewModel.onPermissionsResult(micGranted = mic, cameraGranted = camera)
+    private val micPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val cameraGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        viewModel.onPermissionsResult(micGranted = granted, cameraGranted = cameraGranted)
+    }
+
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val micGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        viewModel.onPermissionsResult(micGranted = micGranted, cameraGranted = granted)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,17 +43,28 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val state by viewModel.uiState.collectAsState()
+
+            // Ask for camera only when a torch command needs it.
+            LaunchedEffect(state.needsCameraPermission) {
+                if (state.needsCameraPermission && !state.cameraPermissionGranted) {
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                }
+            }
+
             AkbarAssistantTheme {
                 AssistantScreen(
                     state = state,
                     onToggleTestMode = viewModel::toggleTestMode,
                     onSimulateWake = viewModel::simulateWake,
-                    onTestCommand = viewModel::runTestCommand
+                    onTestCommand = viewModel::runTestCommand,
+                    onRequestMicPermission = {
+                        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
                 )
             }
         }
 
-        ensurePermissions()
+        ensureMicPermission()
     }
 
     override fun onDestroy() {
@@ -52,22 +74,18 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    private fun ensurePermissions() {
-        val need = mutableListOf<String>()
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            need += Manifest.permission.RECORD_AUDIO
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            need += Manifest.permission.CAMERA
-        }
-        if (need.isEmpty()) {
-            viewModel.onPermissionsResult(micGranted = true, cameraGranted = true)
+    private fun ensureMicPermission() {
+        val micGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        val cameraGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (micGranted) {
+            viewModel.onPermissionsResult(micGranted = true, cameraGranted = cameraGranted)
         } else {
-            permissionLauncher.launch(need.toTypedArray())
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 }
