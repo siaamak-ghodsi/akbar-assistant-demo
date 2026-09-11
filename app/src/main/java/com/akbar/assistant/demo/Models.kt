@@ -14,11 +14,17 @@ enum class AssistantState {
     SPEAKING
 }
 
+data class ChatMessage(
+    val id: Long,
+    val fromUser: Boolean,
+    val text: String
+)
+
 data class AssistantUiState(
     val state: AssistantState = AssistantState.IDLE,
     val language: AppLanguage = AppLanguage.PERSIAN,
-    val statusText: String = "بگو هی اکبر",
-    val hintText: String = "Say Hey Akbar",
+    val statusText: String = "بگو هی اکبر یا اکبر",
+    val hintText: String = "Say Hey Akbar / Akbar",
     val lastHeard: String = "",
     val lastReply: String = "",
     val lightOn: Boolean = false,
@@ -27,5 +33,9 @@ data class AssistantUiState(
     val permissionGranted: Boolean = false,
     val cameraPermissionGranted: Boolean = false,
     val testModeVisible: Boolean = false,
-    val needsCameraPermission: Boolean = false
+    val needsCameraPermission: Boolean = false,
+    /** After first wake (or text), stay in command session without re-waking. */
+    val sessionActive: Boolean = false,
+    val chatMessages: List<ChatMessage> = emptyList(),
+    val draftText: String = ""
 )

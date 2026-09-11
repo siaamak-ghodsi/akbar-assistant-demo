@@ -11,8 +11,8 @@ android {
         applicationId = "com.akbar.assistant.demo"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 8
+        versionName = "2.0-session-chat"
     }
 
     buildTypes {
