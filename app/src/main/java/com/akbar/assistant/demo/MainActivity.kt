@@ -19,9 +19,11 @@ class MainActivity : ComponentActivity() {
     private val viewModel: AssistantViewModel by viewModels()
 
     private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        viewModel.onPermissionResult(granted)
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val mic = result[Manifest.permission.RECORD_AUDIO] == true
+        val camera = result[Manifest.permission.CAMERA] == true
+        viewModel.onPermissionsResult(micGranted = mic, cameraGranted = camera)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,18 +42,37 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        ensureMicPermission()
+        ensurePermissions()
     }
 
-    private fun ensureMicPermission() {
-        val granted = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-        if (granted) {
-            viewModel.onPermissionResult(true)
+    override fun onPause() {
+        // Keep torch state; user may want flashlight while app is briefly paused.
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        if (isFinishing) {
+            viewModel.releaseHardware()
+        }
+        super.onDestroy()
+    }
+
+    private fun ensurePermissions() {
+        val need = mutableListOf<String>()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            need += Manifest.permission.RECORD_AUDIO
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            need += Manifest.permission.CAMERA
+        }
+        if (need.isEmpty()) {
+            viewModel.onPermissionsResult(micGranted = true, cameraGranted = true)
         } else {
-            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            permissionLauncher.launch(need.toTypedArray())
         }
     }
 }

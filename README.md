@@ -10,6 +10,7 @@ This demo reuses well-known open-source patterns instead of inventing speech plu
 Only the bilingual command set, wake phrases, bulb status UI, and Test Mode are custom for this demo.
 
 ## Latest fixes
+- Real device flashlight/torch via `CameraManager` (say «چراغ رو روشن کن»)
 - Removed manual light toggle (bulb is status-only; change via voice/Test Mode)
 - Hardened wake + command parsing (more speech variants, strip wake word from command)
 - Pause mic while TTS speaks so recognition does not fight the speaker
