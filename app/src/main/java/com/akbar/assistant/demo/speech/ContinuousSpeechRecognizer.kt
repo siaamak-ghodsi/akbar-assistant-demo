@@ -11,9 +11,8 @@ import android.speech.SpeechRecognizer
 import java.util.Locale
 
 /**
- * Continuous SpeechRecognizer loop (KontinuousSpeechRecognizer-style):
- * restarts after results / NO_MATCH / timeout.
- * Supports pause/resume so TTS is not interrupted by the mic loop.
+ * Continuous SpeechRecognizer loop with beep silencing and calmer restart timing.
+ * Pause while TTS speaks so the mic does not fight the voice reply.
  */
 class ContinuousSpeechRecognizer(
     private val context: Context,
@@ -28,6 +27,7 @@ class ContinuousSpeechRecognizer(
     private var paused = false
     private val handler = Handler(Looper.getMainLooper())
     private var preferredLocale: Locale = Locale("fa", "IR")
+    private val beepSilencer = RecognitionBeepSilencer(context)
 
     fun setPreferredLocale(locale: Locale) {
         preferredLocale = locale
@@ -41,7 +41,6 @@ class ContinuousSpeechRecognizer(
             return
         }
         ensureRecognizer()
-        // Cancel any in-flight session before starting fresh.
         listening = false
         handler.removeCallbacksAndMessages(null)
         try {
@@ -60,12 +59,14 @@ class ContinuousSpeechRecognizer(
             recognizer?.stopListening()
         } catch (_: Exception) {
         }
+        // Unmute so TTS can play on media / system routes cleanly.
+        beepSilencer.restoreBeeps()
     }
 
     fun resume() {
         if (!shouldRun) return
         paused = false
-        scheduleRestart(200)
+        scheduleRestart(350)
     }
 
     fun stop() {
@@ -78,6 +79,7 @@ class ContinuousSpeechRecognizer(
             recognizer?.stopListening()
         } catch (_: Exception) {
         }
+        beepSilencer.restoreBeeps()
     }
 
     fun destroy() {
@@ -97,6 +99,7 @@ class ContinuousSpeechRecognizer(
     private fun startInternal() {
         if (!shouldRun || paused) return
         ensureRecognizer()
+        beepSilencer.muteBeeps()
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
@@ -104,9 +107,12 @@ class ContinuousSpeechRecognizer(
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, preferredLocale.toLanguageTag())
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR,en-US")
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 900L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 600L)
+            // Longer silence windows = fewer restart loops = fewer beeps + better phrases.
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1400L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 800L)
+            // Reduce endpointer aggressiveness where supported.
+            putExtra("android.speech.extra.DICTATION_MODE", true)
         }
         try {
             listening = true
@@ -114,11 +120,11 @@ class ContinuousSpeechRecognizer(
         } catch (e: Exception) {
             listening = false
             onError(e.message ?: "Failed to start listening")
-            scheduleRestart(700)
+            scheduleRestart(900)
         }
     }
 
-    private fun scheduleRestart(delayMs: Long = 300) {
+    private fun scheduleRestart(delayMs: Long = 500) {
         if (!shouldRun || paused) return
         handler.removeCallbacksAndMessages(null)
         handler.postDelayed({
@@ -129,7 +135,11 @@ class ContinuousSpeechRecognizer(
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) = Unit
         override fun onBeginningOfSpeech() = Unit
-        override fun onRmsChanged(rmsdB: Float) = rmsCallback(rmsdB)
+        override fun onRmsChanged(rmsdB: Float) {
+            // Normalize typical SpeechRecognizer RMS (-2..10) into 0..1
+            val level = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+            rmsCallback(level)
+        }
         override fun onBufferReceived(buffer: ByteArray?) = Unit
         override fun onEndOfSpeech() {
             listening = false
@@ -139,26 +149,31 @@ class ContinuousSpeechRecognizer(
             listening = false
             when (error) {
                 SpeechRecognizer.ERROR_NO_MATCH,
-                SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
-                SpeechRecognizer.ERROR_CLIENT -> scheduleRestart(180)
-                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> scheduleRestart(500)
+                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> scheduleRestart(450)
+                SpeechRecognizer.ERROR_CLIENT -> scheduleRestart(600)
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> scheduleRestart(900)
                 SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
                     onError("Microphone permission required")
+                SpeechRecognizer.ERROR_NETWORK,
+                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> {
+                    onError("Speech network error — check connection / Google app")
+                    scheduleRestart(1500)
+                }
                 else -> {
-                    onError("Recognition error ($error)")
-                    scheduleRestart(700)
+                    scheduleRestart(800)
                 }
             }
         }
 
         override fun onResults(results: Bundle?) {
             listening = false
-            val best = results
+            val matches = results
                 ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                ?.firstOrNull()
                 .orEmpty()
+            val best = matches.firstOrNull().orEmpty()
             if (best.isNotBlank()) onFinalResult(best)
-            scheduleRestart(220)
+            // Give the UI/ViewModel a beat before restarting listen loop.
+            scheduleRestart(500)
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
