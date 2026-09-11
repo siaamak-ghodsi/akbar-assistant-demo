@@ -185,28 +185,35 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Debounced background. Permission dialogs trigger a brief onStop; handing
-     * the mic to FGS immediately was killing in-app wake on real devices.
-     * Until foreground wake is confirmed, we only pause — we do not start FGS.
+     * Hand the microphone to the foreground service when the Activity leaves.
+     * The service must be started before the app is fully backgrounded; otherwise
+     * Android 12+ may reject a background microphone-service start.
      */
     fun onAppBackground() {
         if (!_uiState.value.permissionGranted) return
         backgroundHandoffJob?.cancel()
+
+        try {
+            WakeWordForegroundService.start(getApplication())
+        } catch (e: SecurityException) {
+            _uiState.update {
+                it.copy(errorMessage = "اجازه اجرای سرویس پس‌زمینه داده نشده است")
+            }
+        }
+
         backgroundHandoffJob = viewModelScope.launch {
-            delay(1500)
-            // Still backgrounded after debounce: pause in-app mic only.
+            // Let the service enter foreground before releasing the Activity mic.
+            delay(500)
             speech?.stop()
             speech?.destroy()
             speech = null
-            // FGS deliberately disabled in v1.6 until foreground wake is solid.
-            WakeWordForegroundService.stop(getApplication())
             if (!activated) {
                 _uiState.update {
                     it.copy(
                         hintText = if (it.language == AppLanguage.PERSIAN) {
-                            "برای بیدارباش اپ را باز نگه دارید"
+                            "بیدارباش فعال است؛ بگویید هی اکبر"
                         } else {
-                            "Keep the app open for wake (for now)"
+                            "Wake is active; say Hey Akbar"
                         }
                     )
                 }
