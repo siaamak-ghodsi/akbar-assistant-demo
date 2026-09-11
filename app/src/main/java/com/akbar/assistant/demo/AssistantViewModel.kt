@@ -529,9 +529,24 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
         try {
             speaking = true
+            // Stop mic + restore any muted streams before TTS so the reply is audible.
             speech?.pause()
             _uiState.update { it.copy(state = AssistantState.SPEAKING) }
-            tts?.speak(text, language)
+            // Tiny delay lets the recognizer fully release the audio path.
+            viewModelScope.launch {
+                delay(180)
+                if (!speaking) return@launch
+                try {
+                    tts?.speak(text, language)
+                } catch (e: Exception) {
+                    speaking = false
+                    _uiState.update { it.copy(errorMessage = e.message) }
+                    if (resumeCommandAfterSpeak || sessionActive) {
+                        resumeCommandAfterSpeak = false
+                        startCommandListening()
+                    }
+                }
+            }
         } catch (e: Exception) {
             speaking = false
             _uiState.update { it.copy(errorMessage = e.message) }

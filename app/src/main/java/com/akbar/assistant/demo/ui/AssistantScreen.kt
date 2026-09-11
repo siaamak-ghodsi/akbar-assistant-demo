@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.akbar.assistant.demo.AppLanguage
@@ -127,11 +128,11 @@ fun AssistantScreen(
     ) {
         // Brand title for employer demo
         Text(
-            text = "Akbar assistant",
+            text = "Hey Akbar",
             color = Ink.copy(alpha = 0.94f),
-            fontSize = 20.sp,
+            fontSize = 22.sp,
             fontWeight = FontWeight.Medium,
-            letterSpacing = 0.3.sp,
+            letterSpacing = 0.2.sp,
             modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp),
         )
 
@@ -176,7 +177,19 @@ fun AssistantScreen(
             shadowElevation = 1.dp,
         ) {
             if (state.chatMessages.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize())
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "بگو هی اکبر تا شروع کنیم",
+                        color = Muted,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 28.dp),
+                    )
+                }
             } else {
                 LazyColumn(
                     state = listState,
