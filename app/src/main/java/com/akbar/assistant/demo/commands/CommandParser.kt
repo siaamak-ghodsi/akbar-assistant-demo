@@ -2,6 +2,7 @@ package com.akbar.assistant.demo.commands
 
 import com.akbar.assistant.demo.AppLanguage
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -35,15 +36,21 @@ object CommandParser {
 
     fun containsWakeWord(text: String): Boolean {
         val n = normalize(text)
-        val fa = listOf(
-            "هی اکبر", "هی اگبر", "هی اقبر", "های اکبر", "هی، اکبر",
-            "سلام اکبر", "اکبر جان", "هی akbar", "hey اکبر"
+        val compact = n.replace(" ", "")
+        val phrases = listOf(
+            "هی اکبر", "هی اگبر", "هی اقبر", "های اکبر", "سلام اکبر", "اکبر جان",
+            "یا اکبر", "ای اکبر", "آهای اکبر", "هی akbar", "hey اکبر",
+            "hey akbar", "hi akbar", "hay akbar", "okay akbar", "ok akbar",
+            "hey akber", "hey aqbar", "hey ekbar"
         )
-        val en = listOf(
-            "hey akbar", "hi akbar", "hay akbar", "hey, akbar",
-            "hey akber", "hey aqbar", "okay akbar", "ok akbar", "hey akbaar"
-        )
-        return fa.any { n.contains(it) } || en.any { n.contains(it) }
+        if (phrases.any { n.contains(it) }) return true
+        if (compact.contains("هیاکبر") || compact.contains("heyakbar") || compact.contains("hiakbar")) {
+            return true
+        }
+        // Single-token wake: «اکبر» / Akbar
+        return n == "اکبر" || n == "اگبر" || n == "اقبر" ||
+            n == "akbar" || n == "akber" || n == "aqbar" || n == "ekbar" ||
+            (n.split(" ").size <= 2 && (n.contains("اکبر") || n.contains("akbar")))
     }
 
     fun wakeLanguage(text: String): AppLanguage = detectLanguage(text)
@@ -51,10 +58,10 @@ object CommandParser {
     fun stripWakeWord(text: String): String {
         var n = normalize(text)
         val wakes = listOf(
-            "هی اکبر", "هی اگبر", "هی اقبر", "های اکبر", "هی، اکبر",
-            "سلام اکبر", "اکبر جان", "hey اکبر", "هی akbar",
+            "هی اکبر", "هی اگبر", "هی اقبر", "های اکبر", "سلام اکبر", "اکبر جان",
+            "یا اکبر", "ای اکبر", "آهای اکبر", "hey اکبر", "هی akbar",
             "hey akbar", "hi akbar", "hay akbar", "okay akbar", "ok akbar",
-            "hey akber", "hey aqbar", "hey akbaar"
+            "hey akber", "hey aqbar", "hey ekbar", "اکبر", "اگبر", "akbar", "akber"
         )
         wakes.forEach { wake -> n = n.replace(wake, " ") }
         return n.replace(Regex("\\s+"), " ").trim()
@@ -76,7 +83,8 @@ object CommandParser {
         return if (language == AppLanguage.PERSIAN) {
             n.contains("ساعت") || n.contains("زمان") || n == "ساعت" ||
                 n.contains("چند است") || n.contains("ساعت چند") ||
-                n.contains("ساعت چنده") || n.contains("چه ساعتی")
+                n.contains("ساعت چنده") || n.contains("چه ساعتی") ||
+                n.contains("ساعت چند شد")
         } else {
             n.contains("time") || n.contains("clock") || n == "time" ||
                 n.contains("what time")
@@ -87,7 +95,8 @@ object CommandParser {
         return if (language == AppLanguage.PERSIAN) {
             n.contains("هوا") || n.contains("آب و هوا") || n.contains("اب و هوا") ||
                 n.contains("آب‌وهوا") || n.contains("دما") ||
-                n.contains("چند درجه") || n.contains("هوا چطور") || n.contains("هوا چطوره")
+                n.contains("چند درجه") || n.contains("هوا چطور") || n.contains("هوا چطوره") ||
+                n.contains("وضعیت هوا")
         } else {
             n.contains("weather") || n.contains("temperature") || n.contains("forecast") ||
                 n.contains("how hot") || n.contains("how's the weather")
@@ -125,8 +134,14 @@ object CommandParser {
 
 object ResponseBuilder {
 
+    private val persianDigits = charArrayOf('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹')
+
     fun activationPrompt(language: AppLanguage): String {
-        return if (language == AppLanguage.PERSIAN) "بله، بفرمایید" else "Yes?"
+        return if (language == AppLanguage.PERSIAN) {
+            "بله، بفرمایید. می‌توانید درباره ساعت، هوا، یا چراغ‌قوه بپرسید."
+        } else {
+            "Yes? You can ask about time, weather, or the flashlight."
+        }
     }
 
     fun forCommand(command: AssistantCommand): String {
@@ -134,33 +149,77 @@ object ResponseBuilder {
             is AssistantCommand.TellTime -> time(command.language)
             is AssistantCommand.Weather -> weather(command.language)
             is AssistantCommand.LightOn ->
-                if (command.language == AppLanguage.PERSIAN) "چراغ‌قوه روشن شد" else "Flashlight is on"
+                if (command.language == AppLanguage.PERSIAN) {
+                    "چراغ‌قوه روشن شد."
+                } else {
+                    "Flashlight is on."
+                }
             is AssistantCommand.LightOff ->
-                if (command.language == AppLanguage.PERSIAN) "چراغ‌قوه خاموش شد" else "Flashlight is off"
+                if (command.language == AppLanguage.PERSIAN) {
+                    "چراغ‌قوه خاموش شد."
+                } else {
+                    "Flashlight is off."
+                }
             is AssistantCommand.Unknown ->
                 if (command.language == AppLanguage.PERSIAN) {
-                    "متوجه نشدم. ساعت، هوا، یا چراغ‌قوه؟"
+                    "متوجه نشدم. می‌توانید بگویید ساعت، وضعیت هوا، یا چراغ‌قوه را روشن یا خاموش کن."
                 } else {
-                    "I didn't catch that. Time, weather, or flashlight?"
+                    "I didn't catch that. Try time, weather, or flashlight on/off."
                 }
         }
     }
 
+    private fun toPersianDigits(input: String): String {
+        val out = StringBuilder(input.length)
+        for (ch in input) {
+            out.append(if (ch in '0'..'9') persianDigits[ch - '0'] else ch)
+        }
+        return out.toString()
+    }
+
     private fun time(language: AppLanguage): String {
         return if (language == AppLanguage.PERSIAN) {
-            val t = SimpleDateFormat("HH:mm", Locale.US).format(Date())
-            "الان ساعت $t است"
+            val cal = Calendar.getInstance()
+            val hour = cal.get(Calendar.HOUR_OF_DAY)
+            val minute = cal.get(Calendar.MINUTE)
+            // Spoken words work more reliably with Persian TTS than Eastern digits.
+            val spoken = "الان ساعت ${persianNumberWords(hour)} و ${persianNumberWords(minute)} دقیقه است."
+            val display = toPersianDigits(
+                String.format(Locale.US, "%02d:%02d", hour, minute)
+            )
+            "$spoken ساعت نمایشی $display. اگر کار دیگری دارید بفرمایید."
         } else {
             val t = SimpleDateFormat("h:mm a", Locale.US).format(Date())
-            "It's $t"
+            "It's $t right now. What else can I help with?"
         }
     }
 
     private fun weather(language: AppLanguage): String {
+        // Demo forecast — spoken aloud and kept on screen / in chat.
         return if (language == AppLanguage.PERSIAN) {
-            "امروز هوا آفتابی و ۲۸ درجه است"
+            "وضعیت هوای امروز این‌طور است: آسمان صاف و آفتابی است. " +
+                "دمای هوا حدود بیست و هشت درجه سانتی‌گراد است، " +
+                "رطوبت نسبی کم است و وزش باد ملایم گزارش شده. " +
+                "برای بیرون رفتن هوای خوبی دارید. " +
+                "اگر می‌خواهید ساعت را هم بگویم، کافی است بپرسید."
         } else {
-            "It's sunny and 28 degrees today"
+            "Today's weather: clear and sunny, about 28 degrees Celsius, low humidity, " +
+                "with a light breeze. It's a nice day to be outside. Ask if you'd like the time too."
+        }
+    }
+
+    private fun persianNumberWords(n: Int): String {
+        val value = ((n % 100) + 100) % 100
+        val ones = arrayOf(
+            "صفر", "یک", "دو", "سه", "چهار", "پنج", "شش", "هفت", "هشت", "نه",
+            "ده", "یازده", "دوازده", "سیزده", "چهارده", "پانزده", "شانزده",
+            "هفده", "هجده", "نوزده"
+        )
+        val tens = arrayOf("", "", "بیست", "سی", "چهل", "پنجاه", "شصت", "هفتاد", "هشتاد", "نود")
+        return when {
+            value < 20 -> ones[value]
+            value % 10 == 0 -> tens[value / 10]
+            else -> "${tens[value / 10]} و ${ones[value % 10]}"
         }
     }
 }
