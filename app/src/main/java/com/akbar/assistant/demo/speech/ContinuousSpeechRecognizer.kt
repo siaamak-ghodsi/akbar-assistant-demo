@@ -18,6 +18,7 @@ class ContinuousSpeechRecognizer(
     private val context: Context,
     private val onPartialResult: (String) -> Unit,
     private val onFinalResult: (String) -> Unit,
+    private val onFinalAlternatives: (List<String>) -> Unit = {},
     private val onError: (String) -> Unit = {},
     private val rmsCallback: (Float) -> Unit = {}
 ) {
@@ -121,13 +122,14 @@ class ContinuousSpeechRecognizer(
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 8)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, preferredLocale.toLanguageTag())
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR,en-US")
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1400L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 800L)
+            // Longer silence windows so Persian phrases are less often cut off / timed out.
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2200L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 600L)
             putExtra("android.speech.extra.DICTATION_MODE", true)
         }
         try {
@@ -190,10 +192,13 @@ class ContinuousSpeechRecognizer(
             val matches = results
                 ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 .orEmpty()
-            val best = matches.firstOrNull().orEmpty()
-            if (best.isNotBlank()) onFinalResult(best)
+                .filter { it.isNotBlank() }
+            if (matches.isNotEmpty()) {
+                onFinalAlternatives(matches)
+                onFinalResult(matches.first())
+            }
             // Give the UI/ViewModel a beat before restarting listen loop.
-            scheduleRestart(500)
+            scheduleRestart(450)
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
