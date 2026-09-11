@@ -1,8 +1,14 @@
 package com.akbar.assistant.demo.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +28,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -40,31 +45,35 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.akbar.assistant.demo.AppLanguage
 import com.akbar.assistant.demo.AssistantState
 import com.akbar.assistant.demo.AssistantUiState
-import com.akbar.assistant.demo.ChatMessage
 import com.akbar.assistant.demo.commands.AssistantCommand
+import kotlin.math.cos
+import kotlin.math.sin
 
-private val Bg = Color(0xFFF4F6F8)
+private val Bg = Color(0xFFF3F5F7)
 private val CardBg = Color(0xFFFFFFFF)
 private val Ink = Color(0xFF1E293B)
-private val Muted = Color(0xFF64748B)
+private val Muted = Color(0xFF94A3B8)
 private val Line = Color(0xFFE2E8F0)
 private val Accent = Color(0xFF334155)
-private val Soft = Color(0xFF94A3B8)
-private val Teal = Color(0xFF0F766E)
 private val UserBubble = Color(0xFF1E293B)
 private val BotBubble = Color(0xFFEEF2F6)
+private val ListenBlue = Color(0xFF38BDF8)
+private val SpeakAmber = Color(0xFFFBBF24)
+private val IdleRing = Color(0xFFCBD5E1)
 
 @Composable
 fun AkbarAssistantTheme(content: @Composable () -> Unit) {
@@ -98,134 +107,75 @@ fun AssistantScreen(
         }
     }
 
+    val listening = state.state == AssistantState.LISTENING_WAKE ||
+        state.state == AssistantState.LISTENING_COMMAND
+    val speaking = state.state == AssistantState.SPEAKING
+    val processing = state.state == AssistantState.PROCESSING ||
+        state.state == AssistantState.ACTIVATED
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Bg)
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFFF8FAFC), Bg, Color(0xFFE8EEF4)),
+                ),
+            )
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding(),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column {
-                Text("اکبر", color = Ink, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-                Text("دستیار صوتی", color = Muted, fontSize = 13.sp)
-            }
-            val listening = state.state == AssistantState.LISTENING_WAKE ||
-                state.state == AssistantState.LISTENING_COMMAND
-            Surface(
-                color = if (state.sessionActive) Color(0xFFD1FAE5) else Line,
-                shape = RoundedCornerShape(999.dp),
+        // Minimal brand — name only, no subtitle / instructional copy
+        Text(
+            text = "اکبر",
+            color = Ink.copy(alpha = 0.92f),
+            fontSize = 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+        )
+
+        if (!state.permissionGranted) {
+            Button(
+                onClick = onRequestMicPermission,
+                modifier = Modifier.padding(horizontal = 22.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Accent,
+                    contentColor = Color.White,
+                ),
+                shape = RoundedCornerShape(12.dp),
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(
-                                when {
-                                    listening -> Teal
-                                    state.sessionActive -> Color(0xFF059669)
-                                    else -> Soft
-                                },
-                            ),
-                    )
-                    Spacer(modifier = Modifier.width(7.dp))
-                    Text(
-                        text = when {
-                            state.sessionActive && listening -> "در حال گوش دادن"
-                            state.sessionActive -> "جلسه فعال"
-                            else -> "بگو اکبر"
-                        },
-                        color = if (state.sessionActive) Color(0xFF065F46) else Ink,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
+                Text("اجازه میکروفون")
             }
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
-        Column(
+        // Guardian orb
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 12.dp),
+                .height(260.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = state.statusText,
-                color = Ink,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                lineHeight = 22.sp,
+            GuardianOrb(
+                listening = listening,
+                speaking = speaking,
+                processing = processing,
+                rms = state.rmsLevel,
             )
-            if (state.hintText.isNotBlank()) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(state.hintText, color = Muted, fontSize = 12.sp)
-            }
-            AnimatedVisibility(
-                visible = state.lastHeard.isNotBlank(),
-                enter = fadeIn(),
-                exit = fadeOut(),
-            ) {
-                Text(
-                    text = "شنیدم: ${state.lastHeard}",
-                    color = Soft,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-            if (!state.permissionGranted) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Button(
-                    onClick = onRequestMicPermission,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Accent,
-                        contentColor = Color.White,
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Text("اجازه میکروفون")
-                }
-            }
         }
 
+        // Chat history (answers stay visible; orb shows voice state)
         Surface(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            color = CardBg,
-            shape = RoundedCornerShape(18.dp),
+            color = CardBg.copy(alpha = 0.92f),
+            shape = RoundedCornerShape(20.dp),
             shadowElevation = 1.dp,
         ) {
             if (state.chatMessages.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(28.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = if (state.sessionActive) {
-                            "دستور بگو یا بنویس\nمثلاً: ساعت چند است؟"
-                        } else {
-                            "برای شروع بگو «اکبر»\nیا «هی اکبر»"
-                        },
-                        color = Muted,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 26.sp,
-                        fontSize = 15.sp,
-                    )
-                }
+                Box(modifier = Modifier.fillMaxSize())
             } else {
                 LazyColumn(
                     state = listState,
@@ -275,7 +225,7 @@ fun AssistantScreen(
                 onValueChange = onDraftChanged,
                 modifier = Modifier.weight(1f),
                 enabled = state.permissionGranted,
-                placeholder = { Text("پیام بنویس…", color = Soft) },
+                placeholder = { Text("", color = Muted) },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -286,8 +236,6 @@ fun AssistantScreen(
                     cursorColor = Accent,
                     focusedTextColor = Ink,
                     unfocusedTextColor = Ink,
-                    disabledBorderColor = Line,
-                    disabledContainerColor = Color(0xFFF8FAFC),
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { onSendText() }),
@@ -300,37 +248,34 @@ fun AssistantScreen(
                     containerColor = Accent,
                     contentColor = Color.White,
                     disabledContainerColor = Line,
-                    disabledContentColor = Soft,
+                    disabledContentColor = Muted,
                 ),
                 shape = RoundedCornerShape(14.dp),
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
             ) {
-                Text("ارسال", fontWeight = FontWeight.SemiBold)
+                Text("→", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
 
         if (state.testModeVisible) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("ابزار تست", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = { onSimulateWake(AppLanguage.PERSIAN) },
-                        shape = RoundedCornerShape(10.dp),
-                    ) { Text("اکبر") }
-                    TextButton(onClick = { onTestCommand(AssistantCommand.TellTime(AppLanguage.PERSIAN)) }) {
-                        Text("ساعت")
-                    }
-                    TextButton(onClick = { onTestCommand(AssistantCommand.Weather(AppLanguage.PERSIAN)) }) {
-                        Text("هوا")
-                    }
-                    TextButton(onClick = { onTestCommand(AssistantCommand.LightOn(AppLanguage.PERSIAN)) }) {
-                        Text("چراغ")
-                    }
+                OutlinedButton(
+                    onClick = { onSimulateWake(AppLanguage.PERSIAN) },
+                    shape = RoundedCornerShape(10.dp),
+                ) { Text("اکبر") }
+                TextButton(onClick = { onTestCommand(AssistantCommand.TellTime(AppLanguage.PERSIAN)) }) {
+                    Text("ساعت")
+                }
+                TextButton(onClick = { onTestCommand(AssistantCommand.Weather(AppLanguage.PERSIAN)) }) {
+                    Text("هوا")
+                }
+                TextButton(onClick = { onTestCommand(AssistantCommand.LightOn(AppLanguage.PERSIAN)) }) {
+                    Text("چراغ")
                 }
             }
         }
@@ -338,11 +283,10 @@ fun AssistantScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = 20.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
         ) {
-            Text("حالت تست", color = Muted, fontSize = 13.sp)
             Switch(
                 checked = state.testModeVisible,
                 onCheckedChange = { onToggleTestMode() },
@@ -352,6 +296,111 @@ fun AssistantScreen(
                     uncheckedThumbColor = Color.White,
                     uncheckedTrackColor = Line,
                 ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun GuardianOrb(
+    listening: Boolean,
+    speaking: Boolean,
+    processing: Boolean,
+    rms: Float,
+) {
+    val infinite = rememberInfiniteTransition(label = "guardian")
+    val pulse by infinite.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "pulse",
+    )
+    val spin by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(9000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "spin",
+    )
+    val energy by animateFloatAsState(
+        targetValue = when {
+            speaking -> 0.9f
+            listening -> 0.45f + rms.coerceIn(0f, 1f) * 0.45f
+            processing -> 0.55f
+            else -> 0.22f
+        },
+        animationSpec = tween(350),
+        label = "energy",
+    )
+    val core = when {
+        speaking -> SpeakAmber
+        listening -> ListenBlue
+        processing -> Color(0xFF60A5FA)
+        else -> IdleRing
+    }
+
+    Canvas(modifier = Modifier.size(220.dp)) {
+        val min = size.minDimension
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val scale = if (listening || speaking || processing) pulse else 1f
+
+        // Soft glow
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(core.copy(alpha = 0.22f * energy), Color.Transparent),
+                center = center,
+                radius = min * 0.48f * scale,
+            ),
+            radius = min * 0.48f * scale,
+            center = center,
+        )
+
+        // Outer ring
+        drawCircle(
+            color = core.copy(alpha = 0.28f + energy * 0.35f),
+            radius = min * 0.34f * scale,
+            center = center,
+            style = Stroke(width = (2.4f + energy * 3.2f).dp.toPx()),
+        )
+
+        // Mid ring
+        drawCircle(
+            color = core.copy(alpha = 0.45f),
+            radius = min * 0.24f * scale,
+            center = center,
+            style = Stroke(width = 1.6.dp.toPx()),
+        )
+
+        // Core
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.55f * energy),
+                    core.copy(alpha = 0.35f + energy * 0.25f),
+                    Color.Transparent,
+                ),
+                center = center,
+                radius = min * (0.14f + energy * 0.06f),
+            ),
+            radius = min * (0.14f + energy * 0.06f),
+            center = center,
+        )
+
+        // Orbiting speck while active
+        if (listening || speaking || processing) {
+            val rad = Math.toRadians(spin.toDouble())
+            val orbit = min * 0.30f * scale
+            val cx = center.x + (orbit * cos(rad)).toFloat()
+            val cy = center.y + (orbit * sin(rad)).toFloat()
+            drawCircle(
+                color = Color.White.copy(alpha = 0.75f),
+                radius = 2.4.dp.toPx(),
+                center = Offset(cx, cy),
             )
         }
     }
