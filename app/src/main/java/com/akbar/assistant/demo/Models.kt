@@ -34,6 +34,8 @@ data class AssistantUiState(
     val cameraPermissionGranted: Boolean = false,
     val testModeVisible: Boolean = false,
     val needsCameraPermission: Boolean = false,
+    /** Ask Activity to open Google TTS language download for Persian. */
+    val needsPersianTtsInstall: Boolean = false,
     /** After first wake (or text), stay in command session without re-waking. */
     val sessionActive: Boolean = false,
     val chatMessages: List<ChatMessage> = emptyList(),
