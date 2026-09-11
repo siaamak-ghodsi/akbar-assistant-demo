@@ -89,17 +89,35 @@ class ContinuousSpeechRecognizer(
     }
 
     private fun ensureRecognizer() {
-        if (recognizer == null) {
-            recognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-                setRecognitionListener(listener)
+        if (recognizer != null) return
+        try {
+            if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+                onError("Speech recognition is not available on this device")
+                return
             }
+            recognizer = SpeechRecognizer.createSpeechRecognizer(context)?.also {
+                it.setRecognitionListener(listener)
+            }
+            if (recognizer == null) {
+                onError("Could not create speech recognizer")
+            }
+        } catch (e: Exception) {
+            recognizer = null
+            onError(e.message ?: "Speech recognizer init failed")
         }
     }
 
     private fun startInternal() {
         if (!shouldRun || paused) return
         ensureRecognizer()
-        beepSilencer.muteBeeps()
+        if (recognizer == null) {
+            scheduleRestart(1200)
+            return
+        }
+        try {
+            beepSilencer.muteBeeps()
+        } catch (_: Exception) {
+        }
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
@@ -107,11 +125,9 @@ class ContinuousSpeechRecognizer(
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, preferredLocale.toLanguageTag())
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR,en-US")
-            // Longer silence windows = fewer restart loops = fewer beeps + better phrases.
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1400L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 800L)
-            // Reduce endpointer aggressiveness where supported.
             putExtra("android.speech.extra.DICTATION_MODE", true)
         }
         try {
@@ -119,6 +135,10 @@ class ContinuousSpeechRecognizer(
             recognizer?.startListening(intent)
         } catch (e: Exception) {
             listening = false
+            try {
+                beepSilencer.restoreBeeps()
+            } catch (_: Exception) {
+            }
             onError(e.message ?: "Failed to start listening")
             scheduleRestart(900)
         }
