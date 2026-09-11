@@ -145,6 +145,14 @@ fun AssistantScreen(
                 letterSpacing = 1.sp
             )
 
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = if (speaking) "در حال پاسخ‌گویی" else if (listening) "در حال گوش دادن" else "دستیار هوشمند شما",
+                color = Soft.copy(alpha = 0.72f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Light
+            )
+
             Spacer(modifier = Modifier.weight(0.18f))
 
             PresenceOrb(
@@ -291,6 +299,41 @@ fun AssistantScreen(
             }
 
             Spacer(modifier = Modifier.weight(0.22f))
+
+            // Gemini-inspired bottom command dock: calm, translucent, and always visible.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Glow.copy(alpha = 0.10f), Pearl.copy(alpha = 0.045f))
+                        )
+                    )
+                    .border(1.dp, Pearl.copy(alpha = 0.12f), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 18.dp, vertical = 15.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(
+                        text = "از اکبر بپرسید",
+                        color = Pearl.copy(alpha = 0.92f),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = if (state.language == AppLanguage.PERSIAN) {
+                            "هی اکبر، ساعت چنده؟"
+                        } else {
+                            "Hey Akbar, what time is it?"
+                        },
+                        color = Soft.copy(alpha = 0.78f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Light
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Quiet affordance — not a loud test CTA.
             Text(
