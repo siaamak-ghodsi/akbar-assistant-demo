@@ -6,9 +6,6 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import androidx.core.content.ContextCompat
 
-/**
- * Controls the device torch / flashlight via CameraManager.setTorchMode.
- */
 class FlashlightController(private val context: Context) {
 
     private val cameraManager =
