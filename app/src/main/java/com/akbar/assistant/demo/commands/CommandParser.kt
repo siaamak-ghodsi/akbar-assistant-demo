@@ -35,32 +35,46 @@ object CommandParser {
 
     fun containsWakeWord(text: String): Boolean {
         val n = normalize(text)
-        // Broader STT variants — wake detection only (common mishearings).
+            .replace("‌", " ") // ZWNJ
+            .replace("-", " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        val compact = n.replace(" ", "")
+
+        // Exact / near-exact phrases (including no-space forms from STT).
         val fa = listOf(
             "هی اکبر", "هی اگبر", "هی اقبر", "های اکبر", "هی اکبر جان",
-            "سلام اکبر", "اکبر جان", "هی اکبر جان",
-            "هی akbar", "hey اکبر", "هی اک بار", "یا اکبر", "ای اکبر"
+            "سلام اکبر", "اکبر جان", "یا اکبر", "ای اکبر", "آهای اکبر",
+            "هی اکبره", "هی اکبر جان", "بیدار باش اکبر"
         )
         val en = listOf(
-            "hey akbar", "hi akbar", "hay akbar",
+            "hey akbar", "hi akbar", "hay akbar", "he akbar",
             "hey akber", "hey aqbar", "okay akbar", "ok akbar", "hey akbaar",
-            "hey ak bar", "hey aakbar", "hey akbarr", "yo akbar"
+            "hey ak bar", "hey aakbar", "hey akbarr", "yo akbar", "hey ekbar"
         )
         if (fa.any { n.contains(it) } || en.any { n.contains(it) }) return true
+        if (compact.contains("هیاکبر") || compact.contains("هیاگبر") ||
+            compact.contains("هایاکبر") || compact.contains("heyakbar") ||
+            compact.contains("hiakbar")
+        ) return true
 
-        // Lenient: STT often returns only the name, or splits the phrase.
-        val nameOnly = n == "اکبر" || n == "akbar" || n == "akber" || n == "aqbar" || n == "اگبر"
+        // Lenient: STT often returns only the name.
+        val nameOnly = n == "اکبر" || n == "akbar" || n == "akber" ||
+            n == "aqbar" || n == "اگبر" || n == "ekbar"
         if (nameOnly) return true
 
         val hasFaName = n.contains("اکبر") || n.contains("اگبر") || n.contains("اقبر")
-        val hasEnName = n.contains("akbar") || n.contains("akber") || n.contains("aqbar")
+        val hasEnName = n.contains("akbar") || n.contains("akber") ||
+            n.contains("aqbar") || n.contains("ekbar")
         val hasFaCue = n.contains("هی") || n.contains("های") || n.contains("سلام") ||
-            n.contains("بیدار") || n.contains("یا ")
+            n.contains("بیدار") || n.contains("یا ") || n.contains("آهای") ||
+            n.contains("hey") || n.contains("hi")
         val hasEnCue = n.contains("hey") || n.contains("hi ") || n.startsWith("hi") ||
-            n.contains("hay") || n.contains("okay") || n.contains("ok ")
+            n.contains("hay") || n.contains("okay") || n.contains("ok ") ||
+            n.contains("هی")
+        val short = n.split(" ").size <= 4
         return (hasFaName && hasFaCue) || (hasEnName && hasEnCue) ||
-            (hasFaName && n.split(" ").size <= 3) ||
-            (hasEnName && n.split(" ").size <= 3)
+            (hasFaName && short) || (hasEnName && short)
     }
 
     fun wakeLanguage(text: String): AppLanguage = detectLanguage(text)
