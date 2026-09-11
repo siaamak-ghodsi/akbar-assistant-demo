@@ -23,15 +23,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -59,26 +55,25 @@ import com.akbar.assistant.demo.AssistantUiState
 import com.akbar.assistant.demo.commands.AssistantCommand
 import kotlin.math.sin
 
-private val Night = Color(0xFF071018)
-private val Deep = Color(0xFF0C1822)
-private val Panel = Color(0xFF132231)
-private val Mint = Color(0xFF3DDC97)
-private val Sky = Color(0xFF5EC8F2)
-private val Soft = Color(0xFFD7E2EC)
-private val Muted = Color(0xFF8FA3B5)
-private val BulbOn = Color(0xFFFFD56A)
-private val BulbOff = Color(0xFF4D5C6A)
+private val Ink = Color(0xFF0B1220)
+private val Deep = Color(0xFF122033)
+private val Card = Color(0xFF18263A)
+private val Teal = Color(0xFF2DD4BF)
+private val Blue = Color(0xFF60A5FA)
+private val Cream = Color(0xFFE8EEF7)
+private val Quiet = Color(0xFF93A4BC)
+private val Warn = Color(0xFFFCA5A5)
 
 @Composable
 fun AkbarAssistantTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Mint,
-            background = Night,
-            surface = Panel,
+            primary = Teal,
+            background = Ink,
+            surface = Card,
             onPrimary = Color.Black,
-            onBackground = Soft,
-            onSurface = Soft
+            onBackground = Cream,
+            onSurface = Cream
         ),
         content = content
     )
@@ -91,7 +86,7 @@ fun AssistantScreen(
     onSimulateWake: (AppLanguage) -> Unit,
     onTestCommand: (AssistantCommand) -> Unit
 ) {
-    val active = state.state == AssistantState.LISTENING_WAKE ||
+    val live = state.state == AssistantState.LISTENING_WAKE ||
         state.state == AssistantState.ACTIVATED ||
         state.state == AssistantState.LISTENING_COMMAND ||
         state.state == AssistantState.PROCESSING ||
@@ -100,39 +95,35 @@ fun AssistantScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(Night, Deep, Color(0xFF0A1A16))
-                )
-            )
+            .background(Brush.verticalGradient(listOf(Ink, Deep, Color(0xFF0E1C2A))))
     ) {
-        // Soft atmosphere blobs
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Mint.copy(alpha = 0.12f), Color.Transparent),
-                    center = Offset(size.width * 0.2f, size.height * 0.15f),
+                    colors = listOf(Teal.copy(alpha = 0.14f), Color.Transparent),
+                    center = Offset(size.width * 0.18f, size.height * 0.12f),
                     radius = size.minDimension * 0.55f
                 ),
                 radius = size.minDimension * 0.55f,
-                center = Offset(size.width * 0.2f, size.height * 0.15f)
+                center = Offset(size.width * 0.18f, size.height * 0.12f)
             )
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Sky.copy(alpha = 0.10f), Color.Transparent),
-                    center = Offset(size.width * 0.85f, size.height * 0.28f),
+                    colors = listOf(Blue.copy(alpha = 0.12f), Color.Transparent),
+                    center = Offset(size.width * 0.88f, size.height * 0.22f),
                     radius = size.minDimension * 0.5f
                 ),
                 radius = size.minDimension * 0.5f,
-                center = Offset(size.width * 0.85f, size.height * 0.28f)
+                center = Offset(size.width * 0.88f, size.height * 0.22f)
             )
         }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 28.dp),
+                .padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
@@ -143,27 +134,23 @@ fun AssistantScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "اکبر",
-                        color = Soft,
-                        fontSize = 40.sp,
+                        color = Cream,
+                        fontSize = 44.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Serif,
-                        lineHeight = 44.sp
+                        lineHeight = 48.sp
                     )
-                    Text(
-                        text = "Akbar Assistant",
-                        color = Muted,
-                        fontSize = 15.sp,
-                        letterSpacing = 0.5.sp
-                    )
+                    Text(text = "دستیار صوتی", color = Quiet, fontSize = 15.sp)
                 }
                 LanguageChip(language = state.language)
             }
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(40.dp))
 
-            ListeningOrb(
-                active = active,
-                processing = state.state == AssistantState.PROCESSING || state.state == AssistantState.SPEAKING,
+            VoiceOrb(
+                active = live,
+                speaking = state.state == AssistantState.SPEAKING,
+                processing = state.state == AssistantState.PROCESSING,
                 rms = state.rmsLevel
             )
 
@@ -171,18 +158,17 @@ fun AssistantScreen(
 
             Text(
                 text = state.statusText,
-                color = Soft,
-                fontSize = 30.sp,
+                color = Cream,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
-                lineHeight = 38.sp,
+                lineHeight = 36.sp,
                 modifier = Modifier.fillMaxWidth()
             )
-
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = state.hintText,
-                color = Muted,
+                color = Quiet,
                 fontSize = 15.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
@@ -192,46 +178,42 @@ fun AssistantScreen(
                 state.state != AssistantState.LISTENING_WAKE &&
                 state.state != AssistantState.IDLE
             ) {
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = state.lastReply,
-                    color = Mint,
-                    fontSize = 17.sp,
-                    textAlign = TextAlign.Center,
+                    color = Teal,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
-            Spacer(modifier = Modifier.height(34.dp))
-
-            // Display-only light status (NOT a toggle control)
-            LightStatus(isOn = state.lightOn)
-
             Spacer(modifier = Modifier.height(28.dp))
-
-            HeardCard(lastHeard = state.lastHeard)
+            StatusRow(lightOn = state.lightOn, state = state.state)
+            Spacer(modifier = Modifier.height(18.dp))
+            TranscriptCard(lastHeard = state.lastHeard)
 
             if (!state.permissionGranted) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "برای شروع، دسترسی میکروفون را بدهید\nAllow microphone access to begin",
-                    color = Color(0xFFFF8A80),
+                    text = "دسترسی میکروفون را فعال کنید\nAllow microphone access",
+                    color = Warn,
                     textAlign = TextAlign.Center,
                     fontSize = 14.sp
                 )
             }
 
             state.errorMessage?.let {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = it, color = Color(0xFFFF8A80), fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(text = it, color = Warn, fontSize = 12.sp, textAlign = TextAlign.Center)
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
             TextButton(onClick = onToggleTestMode) {
                 Text(
-                    text = if (state.testModeVisible) "بستن حالت تست / Hide Test" else "حالت تست / Test Mode",
-                    color = Mint
+                    text = if (state.testModeVisible) "بستن تست" else "حالت تست",
+                    color = Teal
                 )
             }
 
@@ -241,8 +223,7 @@ fun AssistantScreen(
                     onTestCommand = onTestCommand
                 )
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(28.dp))
         }
     }
 }
@@ -250,12 +231,12 @@ fun AssistantScreen(
 @Composable
 private fun LanguageChip(language: AppLanguage) {
     val label = if (language == AppLanguage.PERSIAN) "FA" else "EN"
-    val color = if (language == AppLanguage.PERSIAN) Mint else Sky
+    val color = if (language == AppLanguage.PERSIAN) Teal else Blue
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
             .background(color.copy(alpha = 0.14f))
-            .border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(999.dp))
+            .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(999.dp))
             .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
         Text(text = label, color = color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
@@ -263,13 +244,13 @@ private fun LanguageChip(language: AppLanguage) {
 }
 
 @Composable
-private fun ListeningOrb(active: Boolean, processing: Boolean, rms: Float) {
+private fun VoiceOrb(active: Boolean, speaking: Boolean, processing: Boolean, rms: Float) {
     val infinite = rememberInfiniteTransition(label = "orb")
     val pulse by infinite.animateFloat(
-        initialValue = 0.94f,
-        targetValue = 1.08f,
+        initialValue = 0.96f,
+        targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1100, easing = LinearEasing),
+            animation = tween(1200, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse"
@@ -278,46 +259,47 @@ private fun ListeningOrb(active: Boolean, processing: Boolean, rms: Float) {
         initialValue = 0f,
         targetValue = (Math.PI * 2).toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = LinearEasing),
+            animation = tween(1700, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "phase"
     )
     val ring by animateColorAsState(
         targetValue = when {
-            processing -> Mint
-            active -> Sky
-            else -> Color(0xFF2A3A48)
+            speaking -> Teal
+            processing -> Blue
+            active -> Blue.copy(alpha = 0.95f)
+            else -> Color(0xFF334155)
         },
         label = "ring"
     )
 
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(200.dp)) {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(210.dp)) {
         Canvas(
             modifier = Modifier
-                .size(200.dp)
-                .scale(if (active || processing) pulse else 1f)
+                .size(210.dp)
+                .scale(if (active || speaking || processing) pulse else 1f)
         ) {
             drawCircle(
-                color = ring.copy(alpha = 0.16f),
+                color = ring.copy(alpha = 0.14f),
                 radius = size.minDimension / 2.05f,
-                style = Stroke(width = 10.dp.toPx())
+                style = Stroke(width = 12.dp.toPx())
             )
             drawCircle(
                 color = ring,
-                radius = size.minDimension / 2.45f,
-                style = Stroke(width = 3.5.dp.toPx())
+                radius = size.minDimension / 2.4f,
+                style = Stroke(width = 3.dp.toPx())
             )
-            val bars = 11
-            val barW = 4.5.dp.toPx()
-            val gap = 7.dp.toPx()
+            val bars = 12
+            val barW = 4.2.dp.toPx()
+            val gap = 6.5.dp.toPx()
             val total = bars * barW + (bars - 1) * gap
             val startX = (size.width - total) / 2f
             val midY = size.height / 2f
             for (i in 0 until bars) {
-                val amp = 0.3f + 0.7f * ((sin((phase + i * 0.5f).toDouble()) + 1) / 2f).toFloat()
-                val level = if (active || processing) amp * (0.35f + rms * 0.85f) else 0.18f
-                val h = 14.dp.toPx() + level * 48.dp.toPx()
+                val amp = 0.28f + 0.72f * ((sin((phase + i * 0.48f).toDouble()) + 1) / 2f).toFloat()
+                val level = if (active || speaking || processing) amp * (0.3f + rms * 0.9f) else 0.16f
+                val h = 12.dp.toPx() + level * 52.dp.toPx()
                 val x = startX + i * (barW + gap) + barW / 2f
                 drawLine(
                     color = ring,
@@ -332,62 +314,54 @@ private fun ListeningOrb(active: Boolean, processing: Boolean, rms: Float) {
 }
 
 @Composable
-private fun LightStatus(isOn: Boolean) {
-    val glow by animateColorAsState(if (isOn) BulbOn else BulbOff, label = "bulb")
-    val infinite = rememberInfiniteTransition(label = "bulbPulse")
-    val scale by infinite.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isOn) 1.06f else 1f,
-        animationSpec = infiniteRepeatable(tween(1200), RepeatMode.Reverse),
-        label = "bulbScale"
-    )
-
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(128.dp)
-                .scale(if (isOn) scale else 1f)
-                .clip(CircleShape)
-                .background(if (isOn) BulbOn.copy(alpha = 0.16f) else Panel)
-                .border(
-                    1.dp,
-                    if (isOn) BulbOn.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.06f),
-                    CircleShape
-                )
-        ) {
-            Icon(
-                imageVector = if (isOn) Icons.Filled.Lightbulb else Icons.Outlined.Lightbulb,
-                contentDescription = null,
-                tint = glow,
-                modifier = Modifier.size(72.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = if (isOn) "چراغ روشن است · Light is ON" else "چراغ خاموش است · Light is OFF",
-            color = Muted,
-            fontSize = 14.sp,
-            textAlign = TextAlign.Center
+private fun StatusRow(lightOn: Boolean, state: AssistantState) {
+    val mode = when (state) {
+        AssistantState.LISTENING_WAKE -> "آماده"
+        AssistantState.ACTIVATED, AssistantState.LISTENING_COMMAND -> "فعال"
+        AssistantState.PROCESSING -> "پردازش"
+        AssistantState.SPEAKING -> "در حال پاسخ"
+        AssistantState.IDLE -> "متوقف"
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)
+    ) {
+        MetaChip(label = mode)
+        MetaChip(
+            label = if (lightOn) "چراغ‌قوه روشن" else "چراغ‌قوه خاموش",
+            accent = if (lightOn) Teal else Quiet
         )
     }
 }
 
 @Composable
-private fun HeardCard(lastHeard: String) {
+private fun MetaChip(label: String, accent: Color = Quiet) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Card.copy(alpha = 0.9f))
+            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Text(text = label, color = accent, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun TranscriptCard(lastHeard: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(Panel.copy(alpha = 0.92f))
-            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(Card.copy(alpha = 0.92f))
+            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(20.dp))
             .padding(18.dp)
     ) {
-        Text(text = "شنیدم / Heard", color = Muted, fontSize = 12.sp)
+        Text(text = "شنیده‌شده", color = Quiet, fontSize = 12.sp)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = lastHeard.ifBlank { "—" },
-            color = Soft,
+            color = Cream,
             fontSize = 17.sp,
             fontWeight = FontWeight.Medium
         )
@@ -405,16 +379,12 @@ private fun TestPanel(
             .fillMaxWidth()
             .padding(top = 8.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(Panel)
-            .border(1.dp, Mint.copy(alpha = 0.2f), RoundedCornerShape(18.dp))
+            .background(Card)
+            .border(1.dp, Teal.copy(alpha = 0.22f), RoundedCornerShape(18.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(
-            text = "Test Mode — بدون صدا",
-            color = Mint,
-            fontWeight = FontWeight.SemiBold
-        )
+        Text(text = "Test Mode", color = Teal, fontWeight = FontWeight.SemiBold)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -422,25 +392,25 @@ private fun TestPanel(
             Chip("هی اکبر") { onSimulateWake(AppLanguage.PERSIAN) }
             Chip("Hey Akbar") { onSimulateWake(AppLanguage.ENGLISH) }
         }
-        Text(text = "فارسی", color = Muted, fontSize = 12.sp)
+        Text(text = "فارسی", color = Quiet, fontSize = 12.sp)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Chip("ساعت چنده؟") { onTestCommand(AssistantCommand.TellTime(AppLanguage.PERSIAN)) }
-            Chip("هوا چطوره؟") { onTestCommand(AssistantCommand.Weather(AppLanguage.PERSIAN)) }
+            Chip("ساعت؟") { onTestCommand(AssistantCommand.TellTime(AppLanguage.PERSIAN)) }
+            Chip("هوا؟") { onTestCommand(AssistantCommand.Weather(AppLanguage.PERSIAN)) }
             Chip("چراغ روشن") { onTestCommand(AssistantCommand.LightOn(AppLanguage.PERSIAN)) }
             Chip("چراغ خاموش") { onTestCommand(AssistantCommand.LightOff(AppLanguage.PERSIAN)) }
         }
-        Text(text = "English", color = Muted, fontSize = 12.sp)
+        Text(text = "English", color = Quiet, fontSize = 12.sp)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Chip("What time is it?") { onTestCommand(AssistantCommand.TellTime(AppLanguage.ENGLISH)) }
-            Chip("What's the weather?") { onTestCommand(AssistantCommand.Weather(AppLanguage.ENGLISH)) }
-            Chip("Turn on the light") { onTestCommand(AssistantCommand.LightOn(AppLanguage.ENGLISH)) }
-            Chip("Turn off the light") { onTestCommand(AssistantCommand.LightOff(AppLanguage.ENGLISH)) }
+            Chip("Time?") { onTestCommand(AssistantCommand.TellTime(AppLanguage.ENGLISH)) }
+            Chip("Weather?") { onTestCommand(AssistantCommand.Weather(AppLanguage.ENGLISH)) }
+            Chip("Light on") { onTestCommand(AssistantCommand.LightOn(AppLanguage.ENGLISH)) }
+            Chip("Light off") { onTestCommand(AssistantCommand.LightOff(AppLanguage.ENGLISH)) }
         }
     }
 }
@@ -450,8 +420,8 @@ private fun Chip(label: String, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = Soft),
-        border = BorderStroke(1.dp, Mint.copy(alpha = 0.35f)),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Cream),
+        border = BorderStroke(1.dp, Teal.copy(alpha = 0.35f)),
         modifier = Modifier.height(40.dp)
     ) {
         Text(text = label, fontSize = 12.sp, maxLines = 1)
