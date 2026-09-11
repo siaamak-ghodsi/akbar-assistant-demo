@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
             val state by viewModel.uiState.collectAsState()
@@ -43,11 +43,6 @@ class MainActivity : ComponentActivity() {
         }
 
         ensurePermissions()
-    }
-
-    override fun onPause() {
-        // Keep torch state; user may want flashlight while app is briefly paused.
-        super.onPause()
     }
 
     override fun onDestroy() {
