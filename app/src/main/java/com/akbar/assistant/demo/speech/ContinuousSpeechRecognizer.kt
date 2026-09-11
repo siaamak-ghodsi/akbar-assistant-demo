@@ -10,6 +10,11 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import java.util.Locale
 
+/**
+ * Continuous SpeechRecognizer restart loop adapted from patterns used by
+ * KontinuousSpeechRecognizer and Android community continuous-listening demos:
+ * restart after results / NO_MATCH / timeout so wake-word listening stays alive.
+ */
 class ContinuousSpeechRecognizer(
     private val context: Context,
     private val onPartialResult: (String) -> Unit,
@@ -18,10 +23,10 @@ class ContinuousSpeechRecognizer(
     private val onReady: () -> Unit = {},
     private val onRmsChanged: (Float) -> Unit = {}
 ) {
-    private var speechRecognizer: SpeechRecognizer? = null
-    private var isListening = false
+    private var recognizer: SpeechRecognizer? = null
+    private var listening = false
     private var shouldRestart = false
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val handler = Handler(Looper.getMainLooper())
     private var preferredLocale: Locale = Locale("fa", "IR")
 
     fun setPreferredLocale(locale: Locale) {
@@ -35,35 +40,35 @@ class ContinuousSpeechRecognizer(
             return
         }
         ensureRecognizer()
-        startListeningInternal()
+        startInternal()
     }
 
     fun stop() {
         shouldRestart = false
-        isListening = false
-        mainHandler.removeCallbacksAndMessages(null)
+        listening = false
+        handler.removeCallbacksAndMessages(null)
         try {
-            speechRecognizer?.cancel()
-            speechRecognizer?.stopListening()
+            recognizer?.cancel()
+            recognizer?.stopListening()
         } catch (_: Exception) {
         }
     }
 
     fun destroy() {
         stop()
-        speechRecognizer?.destroy()
-        speechRecognizer = null
+        recognizer?.destroy()
+        recognizer = null
     }
 
     private fun ensureRecognizer() {
-        if (speechRecognizer == null) {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-                setRecognitionListener(createListener())
+        if (recognizer == null) {
+            recognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                setRecognitionListener(listener)
             }
         }
     }
 
-    private fun startListeningInternal() {
+    private fun startInternal() {
         if (!shouldRestart) return
         ensureRecognizer()
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -71,22 +76,17 @@ class ContinuousSpeechRecognizer(
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
-            // Prefer both Persian and English; Android uses primary EXTRA_LANGUAGE
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, preferredLocale.toLanguageTag())
-            putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
-                listOf("fa-IR", "en-US").joinToString(",")
-            )
-            // Keep listening a bit longer for wake word / commands
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR,en-US")
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 800L)
         }
         try {
-            isListening = true
-            speechRecognizer?.startListening(intent)
+            listening = true
+            recognizer?.startListening(intent)
         } catch (e: Exception) {
-            isListening = false
+            listening = false
             onError(e.message ?: "Failed to start listening")
             scheduleRestart(600)
         }
@@ -94,32 +94,22 @@ class ContinuousSpeechRecognizer(
 
     private fun scheduleRestart(delayMs: Long = 350) {
         if (!shouldRestart) return
-        mainHandler.postDelayed({
-            if (shouldRestart && !isListening) {
-                startListeningInternal()
-            }
+        handler.postDelayed({
+            if (shouldRestart && !listening) startInternal()
         }, delayMs)
     }
 
-    private fun createListener(): RecognitionListener = object : RecognitionListener {
-        override fun onReadyForSpeech(params: Bundle?) {
-            onReady()
-        }
-
+    private val listener = object : RecognitionListener {
+        override fun onReadyForSpeech(params: Bundle?) = onReady()
         override fun onBeginningOfSpeech() = Unit
-
-        override fun onRmsChanged(rmsdB: Float) {
-            onRmsChanged(rmsdB)
-        }
-
+        override fun onRmsChanged(rmsdB: Float) = onRmsChanged(rmsdB)
         override fun onBufferReceived(buffer: ByteArray?) = Unit
-
         override fun onEndOfSpeech() {
-            isListening = false
+            listening = false
         }
 
         override fun onError(error: Int) {
-            isListening = false
+            listening = false
             val message = when (error) {
                 SpeechRecognizer.ERROR_AUDIO -> "Audio error"
                 SpeechRecognizer.ERROR_CLIENT -> "Client error"
@@ -132,7 +122,6 @@ class ContinuousSpeechRecognizer(
                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timeout"
                 else -> "Recognition error ($error)"
             }
-            // No-match / timeout are normal in continuous listening — just restart
             if (
                 error == SpeechRecognizer.ERROR_NO_MATCH ||
                 error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
@@ -146,21 +135,15 @@ class ContinuousSpeechRecognizer(
         }
 
         override fun onResults(results: Bundle?) {
-            isListening = false
-            val texts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            val best = texts?.firstOrNull().orEmpty()
-            if (best.isNotBlank()) {
-                onFinalResult(best)
-            }
+            listening = false
+            val best = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+            if (best.isNotBlank()) onFinalResult(best)
             scheduleRestart(250)
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
-            val texts = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            val best = texts?.firstOrNull().orEmpty()
-            if (best.isNotBlank()) {
-                onPartialResult(best)
-            }
+            val best = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+            if (best.isNotBlank()) onPartialResult(best)
         }
 
         override fun onEvent(eventType: Int, params: Bundle?) = Unit

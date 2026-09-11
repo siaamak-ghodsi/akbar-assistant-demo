@@ -13,21 +13,20 @@ sealed class AssistantCommand {
     data class Unknown(val language: AppLanguage, val raw: String) : AssistantCommand()
 }
 
+/**
+ * Lightweight bilingual parser inspired by wake-keyword gating patterns
+ * used in continuous SpeechRecognizer demos (e.g. KontinuousSpeechRecognizer).
+ */
 object CommandParser {
 
-    private val persianCharRegex = Regex("[\\u0600-\\u06FF]")
+    private val persianChars = Regex("[\\u0600-\\u06FF]")
 
     fun detectLanguage(text: String): AppLanguage {
-        return if (persianCharRegex.containsMatchIn(text)) {
-            AppLanguage.PERSIAN
-        } else {
-            AppLanguage.ENGLISH
-        }
+        return if (persianChars.containsMatchIn(text)) AppLanguage.PERSIAN else AppLanguage.ENGLISH
     }
 
     fun normalize(text: String): String {
-        return text
-            .trim()
+        return text.trim()
             .lowercase(Locale.ROOT)
             .replace('ي', 'ی')
             .replace('ك', 'ک')
@@ -36,23 +35,9 @@ object CommandParser {
 
     fun containsWakeWord(text: String): Boolean {
         val n = normalize(text)
-        val persianWake = listOf(
-            "هی اکبر",
-            "هی، اکبر",
-            "هی اگبر",
-            "هی اکبر؟",
-            "hey اکبر",
-            "هی akbar"
-        )
-        val englishWake = listOf(
-            "hey akbar",
-            "hi akbar",
-            "hay akbar",
-            "hey, akbar",
-            "hey akbar!",
-            "hey akbar?"
-        )
-        return persianWake.any { n.contains(it) } || englishWake.any { n.contains(it) }
+        val fa = listOf("هی اکبر", "هی، اکبر", "هی اگبر", "hey اکبر", "هی akbar")
+        val en = listOf("hey akbar", "hi akbar", "hay akbar", "hey, akbar")
+        return fa.any { n.contains(it) } || en.any { n.contains(it) }
     }
 
     fun wakeLanguage(text: String): AppLanguage = detectLanguage(text)
@@ -60,53 +45,37 @@ object CommandParser {
     fun parse(text: String): AssistantCommand {
         val language = detectLanguage(text)
         val n = normalize(text)
-
         return when {
-            isTimeCommand(n, language) -> AssistantCommand.TellTime(language)
-            isWeatherCommand(n, language) -> AssistantCommand.Weather(language)
-            isLightOnCommand(n, language) -> AssistantCommand.LightOn(language)
-            isLightOffCommand(n, language) -> AssistantCommand.LightOff(language)
+            isTime(n, language) -> AssistantCommand.TellTime(language)
+            isWeather(n, language) -> AssistantCommand.Weather(language)
+            isLightOn(n, language) -> AssistantCommand.LightOn(language)
+            isLightOff(n, language) -> AssistantCommand.LightOff(language)
             else -> AssistantCommand.Unknown(language, text)
         }
     }
 
-    private fun isTimeCommand(n: String, language: AppLanguage): Boolean {
+    private fun isTime(n: String, language: AppLanguage): Boolean {
         return if (language == AppLanguage.PERSIAN) {
-            n.contains("ساعت") && (
-                n.contains("چند") ||
-                    n.contains("چنده") ||
-                    n.contains("چیست") ||
-                    n.contains("چیه")
-                )
+            n.contains("ساعت") && (n.contains("چند") || n.contains("چنده") || n.contains("چیست") || n.contains("چیه"))
         } else {
-            n.contains("what time") ||
-                n.contains("what's the time") ||
-                n.contains("whats the time") ||
-                n.contains("tell me the time") ||
-                n == "time" ||
-                n.contains("current time")
+            n.contains("what time") || n.contains("what's the time") || n.contains("whats the time") ||
+                n.contains("tell me the time") || n == "time" || n.contains("current time")
         }
     }
 
-    private fun isWeatherCommand(n: String, language: AppLanguage): Boolean {
+    private fun isWeather(n: String, language: AppLanguage): Boolean {
         return if (language == AppLanguage.PERSIAN) {
-            n.contains("هوا") ||
-                n.contains("وضعیت هوا") ||
-                n.contains("آب و هوا") ||
-                n.contains("اب و هوا")
+            n.contains("هوا") || n.contains("وضعیت هوا") || n.contains("آب و هوا") || n.contains("اب و هوا")
         } else {
-            n.contains("weather") ||
-                n.contains("how's the weather") ||
-                n.contains("how is the weather") ||
-                n.contains("what's the weather") ||
-                n.contains("whats the weather")
+            n.contains("weather") || n.contains("how's the weather") || n.contains("how is the weather") ||
+                n.contains("what's the weather") || n.contains("whats the weather")
         }
     }
 
-    private fun isLightOnCommand(n: String, language: AppLanguage): Boolean {
+    private fun isLightOn(n: String, language: AppLanguage): Boolean {
         return if (language == AppLanguage.PERSIAN) {
             (n.contains("چراغ") || n.contains("لامپ") || n.contains("نور")) &&
-                (n.contains("روشن") || n.contains("روشن کن") || n.contains("باز کن"))
+                (n.contains("روشن") || n.contains("باز کن"))
         } else {
             (n.contains("light") || n.contains("lights") || n.contains("lamp") || n.contains("bulb")) &&
                 (n.contains("on") || n.contains("turn on") || n.contains("enable")) &&
@@ -114,7 +83,7 @@ object CommandParser {
         }
     }
 
-    private fun isLightOffCommand(n: String, language: AppLanguage): Boolean {
+    private fun isLightOff(n: String, language: AppLanguage): Boolean {
         return if (language == AppLanguage.PERSIAN) {
             (n.contains("چراغ") || n.contains("لامپ") || n.contains("نور")) &&
                 (n.contains("خاموش") || n.contains("ببند") || n.contains("قطع"))
@@ -128,64 +97,38 @@ object CommandParser {
 object ResponseBuilder {
 
     fun activationPrompt(language: AppLanguage): String {
-        return if (language == AppLanguage.PERSIAN) {
-            "بله، بفرمایید"
-        } else {
-            "Yes, I'm listening"
-        }
+        return if (language == AppLanguage.PERSIAN) "بله، بفرمایید" else "Yes, I'm listening"
     }
 
-    fun forCommand(command: AssistantCommand, @Suppress("UNUSED_PARAMETER") lightOn: Boolean = false): String {
+    fun forCommand(command: AssistantCommand): String {
         return when (command) {
-            is AssistantCommand.TellTime -> timeResponse(command.language)
-            is AssistantCommand.Weather -> weatherResponse(command.language)
-            is AssistantCommand.LightOn -> lightOnResponse(command.language)
-            is AssistantCommand.LightOff -> lightOffResponse(command.language)
-            is AssistantCommand.Unknown -> unknownResponse(command.language)
+            is AssistantCommand.TellTime -> time(command.language)
+            is AssistantCommand.Weather -> weather(command.language)
+            is AssistantCommand.LightOn -> if (command.language == AppLanguage.PERSIAN) "چراغ روشن شد" else "The light is on"
+            is AssistantCommand.LightOff -> if (command.language == AppLanguage.PERSIAN) "چراغ خاموش شد" else "The light is off"
+            is AssistantCommand.Unknown -> if (command.language == AppLanguage.PERSIAN) {
+                "متوجه نشدم. می‌توانید ساعت، هوا یا چراغ را بپرسید."
+            } else {
+                "I didn't catch that. Ask about time, weather, or the light."
+            }
         }
     }
 
-    private fun timeResponse(language: AppLanguage): String {
+    private fun time(language: AppLanguage): String {
         return if (language == AppLanguage.PERSIAN) {
-            val formatter = SimpleDateFormat("HH:mm", Locale("fa", "IR"))
-            val time = formatter.format(Date())
-            "الان ساعت $time است"
+            val t = SimpleDateFormat("HH:mm", Locale("fa", "IR")).format(Date())
+            "الان ساعت $t است"
         } else {
-            val formatter = SimpleDateFormat("h:mm a", Locale.US)
-            val time = formatter.format(Date())
-            "It's $time"
+            val t = SimpleDateFormat("h:mm a", Locale.US).format(Date())
+            "It's $t"
         }
     }
 
-    private fun weatherResponse(language: AppLanguage): String {
+    private fun weather(language: AppLanguage): String {
         return if (language == AppLanguage.PERSIAN) {
             "امروز هوا آفتابی و ۲۸ درجه است"
         } else {
             "It's sunny and 28 degrees today"
-        }
-    }
-
-    private fun lightOnResponse(language: AppLanguage): String {
-        return if (language == AppLanguage.PERSIAN) {
-            "چراغ روشن شد"
-        } else {
-            "The light is on"
-        }
-    }
-
-    private fun lightOffResponse(language: AppLanguage): String {
-        return if (language == AppLanguage.PERSIAN) {
-            "چراغ خاموش شد"
-        } else {
-            "The light is off"
-        }
-    }
-
-    private fun unknownResponse(language: AppLanguage): String {
-        return if (language == AppLanguage.PERSIAN) {
-            "متوجه نشدم. می‌توانید ساعت، هوا یا چراغ را بپرسید."
-        } else {
-            "I didn't catch that. You can ask about time, weather, or the light."
         }
     }
 }
