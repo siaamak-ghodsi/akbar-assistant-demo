@@ -16,7 +16,7 @@ Only the bilingual command set, wake phrases, bulb UI, and Test Mode are custom 
 1. Install **Android Studio Hedgehog or newer** (SDK 34).
 2. `git clone https://github.com/siaamak-ghodsi/akbar-assistant-demo.git`
 3. **File → Open** → select the project root.
-4. Wait for Gradle sync (wrapper JAR is included).
+4. Wait for Gradle sync (Android Studio downloads Gradle automatically).
 5. Use a **device/emulator with Google Play** (speech needs it). Grant **Microphone**.
 6. Run ▶ `app`.
 7. Say **«هی اکبر»** or **"Hey Akbar"**, then a command — or tap **Test Mode**.
