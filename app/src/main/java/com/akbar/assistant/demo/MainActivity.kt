@@ -64,8 +64,27 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
 
-        ensureMicPermission()
+    override fun onStart() {
+        super.onStart()
+        val micGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        val cameraGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        if (micGranted) {
+            viewModel.onPermissionsResult(micGranted = true, cameraGranted = cameraGranted)
+            viewModel.onAppForeground()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    override fun onStop() {
+        viewModel.onAppBackground()
+        super.onStop()
     }
 
     override fun onDestroy() {
@@ -73,20 +92,5 @@ class MainActivity : ComponentActivity() {
             viewModel.releaseHardware()
         }
         super.onDestroy()
-    }
-
-    private fun ensureMicPermission() {
-        val micGranted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-        val cameraGranted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (micGranted) {
-            viewModel.onPermissionsResult(micGranted = true, cameraGranted = cameraGranted)
-        } else {
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
     }
 }
