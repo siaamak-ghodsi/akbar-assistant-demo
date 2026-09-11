@@ -125,13 +125,14 @@ fun AssistantScreen(
             .navigationBarsPadding()
             .imePadding(),
     ) {
-        // Minimal brand — name only, no subtitle / instructional copy
+        // Brand title for employer demo
         Text(
-            text = "اکبر",
-            color = Ink.copy(alpha = 0.92f),
-            fontSize = 22.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+            text = "Akbar assistant",
+            color = Ink.copy(alpha = 0.94f),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 0.3.sp,
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp),
         )
 
         if (!state.permissionGranted) {
@@ -253,7 +254,11 @@ fun AssistantScreen(
                 shape = RoundedCornerShape(14.dp),
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
             ) {
-                Text("→", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "ارسال",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                )
             }
         }
 
