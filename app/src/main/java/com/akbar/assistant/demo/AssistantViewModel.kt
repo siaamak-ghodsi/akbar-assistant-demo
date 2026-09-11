@@ -70,8 +70,20 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         }
                     }
                 }
-            }
+            },
+            onPersianVoiceMissing = {
+                _uiState.update {
+                    it.copy(
+                        needsPersianTtsInstall = true,
+                        hintText = "برای صدای فارسی، بستهٔ زبان TTS را نصب کنید",
+                    )
+                }
+            },
         )
+    }
+
+    fun clearPersianTtsInstallPrompt() {
+        _uiState.update { it.copy(needsPersianTtsInstall = false) }
     }
 
     fun onPermissionsResult(micGranted: Boolean, cameraGranted: Boolean) {
@@ -499,7 +511,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private fun armSessionTimeout(language: AppLanguage) {
         commandTimeoutJob?.cancel()
         commandTimeoutJob = viewModelScope.launch {
-            delay(45_000)
+            delay(120_000)
             if (sessionActive && !speaking) {
                 sessionActive = false
                 activated = false
