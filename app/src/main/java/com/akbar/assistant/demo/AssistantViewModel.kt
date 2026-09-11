@@ -232,7 +232,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             onPartialResult = { text ->
                 if (!(activated || speaking)) {
                     _uiState.update { it.copy(lastHeard = text) }
-                    if (CommandParser.containsWakeWord(text)) {
+                    if (CommandParser.containsWakeWord(text) &&
+                        CommandParser.stripWakeWord(text).isBlank()
+                    ) {
                         onWakeDetected(CommandParser.wakeLanguage(text), text)
                     }
                 }
