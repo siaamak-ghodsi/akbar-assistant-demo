@@ -124,11 +124,7 @@ fun AssistantScreen(
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = "اکبر دستیار",
-                        color = TextSecondary,
-                        fontSize = 14.sp
-                    )
+                    Text(text = "اکبر دستیار", color = TextSecondary, fontSize = 14.sp)
                 }
                 LanguageBadge(language = state.language)
             }
@@ -168,14 +164,8 @@ fun AssistantScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
-
-            LightBulbVisual(
-                isOn = state.lightOn,
-                onClick = onToggleLightManual
-            )
-
+            LightBulbVisual(isOn = state.lightOn, onClick = onToggleLightManual)
             Spacer(modifier = Modifier.height(28.dp))
-
             HeardPanel(lastHeard = state.lastHeard)
 
             if (!state.permissionGranted) {
@@ -194,7 +184,6 @@ fun AssistantScreen(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-
             TextButton(onClick = onToggleTestMode) {
                 Text(
                     text = if (state.testModeVisible) "Hide Test Mode" else "Test Mode",
@@ -208,7 +197,6 @@ fun AssistantScreen(
                     onTestCommand = onTestCommand
                 )
             }
-
             Spacer(modifier = Modifier.height(20.dp))
         }
     }
@@ -225,12 +213,7 @@ private fun LanguageBadge(language: AppLanguage) {
             .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
             .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
-        Text(
-            text = label,
-            color = color,
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp
-        )
+        Text(text = label, color = color, fontWeight = FontWeight.Bold, fontSize = 14.sp)
     }
 }
 
@@ -264,10 +247,7 @@ private fun ListeningIndicator(active: Boolean, processing: Boolean, rms: Float)
         label = "ringColor"
     )
 
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.size(180.dp)
-    ) {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(180.dp)) {
         Canvas(
             modifier = Modifier
                 .size(180.dp)
@@ -309,21 +289,14 @@ private fun ListeningIndicator(active: Boolean, processing: Boolean, rms: Float)
 
 @Composable
 private fun LightBulbVisual(isOn: Boolean, onClick: () -> Unit) {
-    val glow by animateColorAsState(
-        targetValue = if (isOn) LightOn else LightOff,
-        label = "bulb"
-    )
+    val glow by animateColorAsState(targetValue = if (isOn) LightOn else LightOff, label = "bulb")
     val infinite = rememberInfiniteTransition(label = "glow")
     val glowScale by infinite.animateFloat(
         initialValue = 1f,
         targetValue = if (isOn) 1.08f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000),
-            repeatMode = RepeatMode.Reverse
-        ),
+        animationSpec = infiniteRepeatable(animation = tween(1000), repeatMode = RepeatMode.Reverse),
         label = "glowScale"
     )
-
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             contentAlignment = Alignment.Center,
@@ -331,9 +304,7 @@ private fun LightBulbVisual(isOn: Boolean, onClick: () -> Unit) {
                 .size(140.dp)
                 .scale(if (isOn) glowScale else 1f)
                 .clip(CircleShape)
-                .background(
-                    if (isOn) LightOn.copy(alpha = 0.18f) else Color(0xFF1A222C)
-                )
+                .background(if (isOn) LightOn.copy(alpha = 0.18f) else Color(0xFF1A222C))
                 .clickable(onClick = onClick)
         ) {
             Icon(
@@ -360,17 +331,9 @@ private fun HeardPanel(lastHeard: String) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Last recognized / آخرین تشخیص",
-                color = TextSecondary,
-                fontSize = 12.sp
-            )
+            Text(text = "Last recognized / آخرین تشخیص", color = TextSecondary, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = lastHeard.ifBlank { "—" },
-                color = TextPrimary,
-                fontSize = 16.sp
-            )
+            Text(text = lastHeard.ifBlank { "—" }, color = TextPrimary, fontSize = 16.sp)
         }
     }
 }
@@ -397,7 +360,6 @@ private fun TestModePanel(
                 color = Accent,
                 fontWeight = FontWeight.SemiBold
             )
-
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -405,43 +367,25 @@ private fun TestModePanel(
                 SmallAction("هی اکبر") { onSimulateWake(AppLanguage.PERSIAN) }
                 SmallAction("Hey Akbar") { onSimulateWake(AppLanguage.ENGLISH) }
             }
-
             Text(text = "Persian commands", color = TextSecondary, fontSize = 12.sp)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                SmallAction("ساعت چنده؟") {
-                    onTestCommand(AssistantCommand.TellTime(AppLanguage.PERSIAN))
-                }
-                SmallAction("هوا چطوره؟") {
-                    onTestCommand(AssistantCommand.Weather(AppLanguage.PERSIAN))
-                }
-                SmallAction("چراغ روشن") {
-                    onTestCommand(AssistantCommand.LightOn(AppLanguage.PERSIAN))
-                }
-                SmallAction("چراغ خاموش") {
-                    onTestCommand(AssistantCommand.LightOff(AppLanguage.PERSIAN))
-                }
+                SmallAction("ساعت چنده؟") { onTestCommand(AssistantCommand.TellTime(AppLanguage.PERSIAN)) }
+                SmallAction("هوا چطوره؟") { onTestCommand(AssistantCommand.Weather(AppLanguage.PERSIAN)) }
+                SmallAction("چراغ روشن") { onTestCommand(AssistantCommand.LightOn(AppLanguage.PERSIAN)) }
+                SmallAction("چراغ خاموش") { onTestCommand(AssistantCommand.LightOff(AppLanguage.PERSIAN)) }
             }
-
             Text(text = "English commands", color = TextSecondary, fontSize = 12.sp)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                SmallAction("What time is it?") {
-                    onTestCommand(AssistantCommand.TellTime(AppLanguage.ENGLISH))
-                }
-                SmallAction("What's the weather?") {
-                    onTestCommand(AssistantCommand.Weather(AppLanguage.ENGLISH))
-                }
-                SmallAction("Turn on the light") {
-                    onTestCommand(AssistantCommand.LightOn(AppLanguage.ENGLISH))
-                }
-                SmallAction("Turn off the light") {
-                    onTestCommand(AssistantCommand.LightOff(AppLanguage.ENGLISH))
-                }
+                SmallAction("What time is it?") { onTestCommand(AssistantCommand.TellTime(AppLanguage.ENGLISH)) }
+                SmallAction("What's the weather?") { onTestCommand(AssistantCommand.Weather(AppLanguage.ENGLISH)) }
+                SmallAction("Turn on the light") { onTestCommand(AssistantCommand.LightOn(AppLanguage.ENGLISH)) }
+                SmallAction("Turn off the light") { onTestCommand(AssistantCommand.LightOff(AppLanguage.ENGLISH)) }
             }
         }
     }
