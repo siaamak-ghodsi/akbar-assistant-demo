@@ -54,7 +54,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                     returnToWakeAfterSpeak -> {
                         returnToWakeAfterSpeak = false
-                        // Only leave session if it was explicitly ended.
                         if (!sessionActive) {
                             activated = false
                             awaitingCommand = false
@@ -141,7 +140,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if (text.isBlank()) return
         _uiState.update { it.copy(draftText = "") }
 
-        // Text counts as activating the session — no wake needed again.
         if (!sessionActive) {
             openSession(CommandParser.detectLanguage(text))
         }
@@ -153,9 +151,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
         activated = true
         awaitingCommand = true
-        handleCommand(text)
+        handleCommandAlternatives(listOf(text))
     }
-
 
     fun onAppForeground() {
         if (!_uiState.value.permissionGranted) return
@@ -205,7 +202,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         awaitingCommand = false
         resumeCommandAfterSpeak = false
         returnToWakeAfterSpeak = false
-        // Keep sessionActive as-is only if we intentionally stay in session.
         if (!sessionActive) {
             ensureSpeech()
             speech?.setPreferredLocale(Locale("fa", "IR"))
@@ -250,16 +246,21 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             },
             onFinalResult = { text ->
-                if (speaking) return@ContinuousSpeechRecognizer
+                if (speaking || text.isBlank()) return@ContinuousSpeechRecognizer
+                _uiState.update { it.copy(lastHeard = text) }
+            },
+            onFinalAlternatives = { matches ->
+                if (speaking || matches.isEmpty()) return@ContinuousSpeechRecognizer
                 when {
                     !activated -> {
-                        if (CommandParser.containsWakeWord(text)) {
-                            onWakeDetected(CommandParser.wakeLanguage(text), text)
+                        val wakeHit = matches.firstOrNull { CommandParser.containsWakeWord(it) }
+                        if (wakeHit != null) {
+                            onWakeDetected(CommandParser.wakeLanguage(wakeHit), wakeHit)
                         }
                     }
                     awaitingCommand -> {
-                        _uiState.update { it.copy(lastHeard = text) }
-                        handleCommand(text)
+                        _uiState.update { it.copy(lastHeard = matches.first()) }
+                        handleCommandAlternatives(matches)
                     }
                 }
             },
@@ -361,10 +362,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         armSessionTimeout(_uiState.value.language)
     }
 
-    private fun handleCommand(text: String) {
+    private fun handleCommandAlternatives(matches: List<String>) {
+        val text = matches.firstOrNull { it.isNotBlank() } ?: return
         val stripped = CommandParser.stripWakeWord(text)
         if (stripped.isBlank()) {
-            // Bare wake while already in session — just re-prompt.
             if (CommandParser.containsWakeWord(text)) {
                 val prompt = ResponseBuilder.activationPrompt(_uiState.value.language)
                 appendChat(fromUser = false, prompt)
@@ -380,7 +381,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         speech?.pause()
         appendChat(fromUser = true, text)
 
-        val command = CommandParser.parse(text)
+        val command = CommandParser.parseBest(matches)
         val language = languageOf(command)
         _uiState.update {
             it.copy(
@@ -404,11 +405,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 when (flashlight.setEnabled(true)) {
                     FlashlightController.Result.ON -> {
                         nextLight = true
-                        reply = if (language == AppLanguage.PERSIAN) {
-                            "چراغ‌قوه روشن شد."
-                        } else {
-                            "Flashlight is on."
-                        }
+                        reply = ResponseBuilder.forCommand(AssistantCommand.LightOn(language))
                     }
                     FlashlightController.Result.NO_PERMISSION -> {
                         nextLight = false
@@ -441,11 +438,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 when (flashlight.setEnabled(false)) {
                     FlashlightController.Result.OFF -> {
                         nextLight = false
-                        reply = if (language == AppLanguage.PERSIAN) {
-                            "چراغ‌قوه خاموش شد."
-                        } else {
-                            "Flashlight is off."
-                        }
+                        reply = ResponseBuilder.forCommand(AssistantCommand.LightOff(language))
                     }
                     FlashlightController.Result.NO_PERMISSION -> {
                         reply = if (language == AppLanguage.PERSIAN) {
@@ -477,7 +470,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         awaitingCommand = false
-        // Stay in session after every answer — no re-wake required.
         resumeCommandAfterSpeak = true
         returnToWakeAfterSpeak = false
         sessionActive = true
@@ -500,7 +492,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 lastHeard = ""
             )
         }
-        // Always speak — including longer weather replies.
         speakReply(reply, language)
         armSessionTimeout(language)
     }
@@ -508,8 +499,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private fun armSessionTimeout(language: AppLanguage) {
         commandTimeoutJob?.cancel()
         commandTimeoutJob = viewModelScope.launch {
-            // Long idle window so weather text stays and multi-command flow feels natural.
-            delay(90_000)
+            delay(45_000)
             if (sessionActive && !speaking) {
                 sessionActive = false
                 activated = false
@@ -529,13 +519,26 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-
     private fun speakReply(text: String, language: AppLanguage) {
-        if (text.isBlank()) return
+        if (text.isBlank()) {
+            if (resumeCommandAfterSpeak || sessionActive) {
+                resumeCommandAfterSpeak = false
+                startCommandListening()
+            }
+            return
+        }
         try {
+            speaking = true
+            speech?.pause()
+            _uiState.update { it.copy(state = AssistantState.SPEAKING) }
             tts?.speak(text, language)
         } catch (e: Exception) {
+            speaking = false
             _uiState.update { it.copy(errorMessage = e.message) }
+            if (resumeCommandAfterSpeak || sessionActive) {
+                resumeCommandAfterSpeak = false
+                startCommandListening()
+            }
         }
     }
 
