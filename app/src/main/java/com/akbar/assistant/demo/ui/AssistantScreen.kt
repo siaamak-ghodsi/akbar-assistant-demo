@@ -196,6 +196,31 @@ fun AssistantScreen(
                 }
             }
 
+            AnimatedVisibility(
+                visible = state.lastReply.isNotBlank(),
+                enter = fadeIn(tween(220)) + scaleIn(initialScale = 0.98f),
+                exit = fadeOut(tween(160)) + scaleOut(targetScale = 0.98f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 18.dp)
+                        .fillMaxWidth(0.92f)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Speak.copy(alpha = 0.08f))
+                        .border(1.dp, Speak.copy(alpha = 0.18f), RoundedCornerShape(18.dp))
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = state.lastReply,
+                        color = Speak,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 24.sp
+                    )
+                }
+            }
+
             // Captions only while awaiting / processing a command — never during quiet wake.
             AnimatedVisibility(
                 visible = state.lastHeard.isNotBlank() &&

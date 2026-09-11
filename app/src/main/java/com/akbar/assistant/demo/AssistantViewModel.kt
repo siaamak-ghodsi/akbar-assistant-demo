@@ -156,7 +156,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     _uiState.update { it.copy(lastHeard = text) }
                 }
                 if (!activated && !speaking && CommandParser.containsWakeWord(text)) {
-                    onWakeDetected(CommandParser.wakeLanguage(text), text)
+                    // If the partial result already contains a command, wait for the
+                    // final result so pausing recognition does not cut the phrase.
+                    if (CommandParser.stripWakeWord(text).isBlank()) {
+                        onWakeDetected(CommandParser.wakeLanguage(text), text)
+                    }
                 }
             },
             onFinalResult = { text ->
