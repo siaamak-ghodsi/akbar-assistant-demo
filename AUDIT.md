@@ -59,13 +59,13 @@ Minimal · luxurious · soft motion · one job per screen · trust & intelligenc
 ### Issues found on re-review
 23. Spoken reply duplicated: status and lastReply showed the same sentence while speaking.
 24. Wake phase streamed every partial into lastHeard — visual noise vs Siri’s quiet standby.
-25. Status competed with brand wordmark; wake should feel quieter.
+25. Status “هی اکبر” competed with brand wordmark; wake should feel quieter.
 26. Flashlight pill always bilingual; should follow active language.
 27. Speak accent used purple-leaning tint; shifted to warm champagne for trust/luxury.
 28. Orb spring was slightly bouncy; softened to low-stiffness no-bounce breath.
 29. Weather parser missed common FA phrases (`چند درجه`, `هوا چطوره`).
 30. Stale lastHeard / lastReply lingered after returning to wake.
-31. Test lab still too loud; reduced to a quieter `···` affordance.
+31. Test lab still too loud; reduced to a quieter “···” affordance.
 32. Camera-grant path should clear the flag calmly and invite a second ask.
 33. Layer naming drift across ViewModel / speech / UI broke reliability — unified API contracts.
 
@@ -75,6 +75,7 @@ Minimal · luxurious · soft motion · one job per screen · trust & intelligenc
 - Language-aware torch pill; champagne speak glow; calmer orb physics
 - Richer FA weather/time patterns; quieter test entry; version 1.3
 - Coherent ViewModel ↔ speech ↔ flashlight ↔ Compose contracts
+
 
 ## Stage 4 complete — delivery gate
 - Clean `./gradlew clean assembleDebug` succeeded
