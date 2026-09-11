@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -64,12 +65,12 @@ import com.akbar.assistant.demo.commands.AssistantCommand
 import kotlin.math.cos
 import kotlin.math.sin
 
-private val Void = Color(0xFF07090F)
-private val Mist = Color(0xFF121624)
+private val Void = Color(0xFF060817)
+private val Mist = Color(0xFF11152B)
 private val Pearl = Color(0xFFF2F4F8)
 private val Soft = Color(0xFFB8C0D0)
 private val Dim = Color(0xFF7A8498)
-private val Glow = Color(0xFF9EC5FF)
+private val Glow = Color(0xFF9D8CFF)
 /** Warm champagne speaking accent — calm trust, not purple-AI cliché. */
 private val Speak = Color(0xFFE8D5B5)
 private val Ok = Color(0xFF8EE0C4)
@@ -107,7 +108,11 @@ fun AssistantScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Void, Mist, Color(0xFF0C101C))))
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF08051A), Color(0xFF10183A), Color(0xFF090D20))
+                )
+            )
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawCircle(
@@ -136,22 +141,36 @@ fun AssistantScreen(
         ) {
             Spacer(modifier = Modifier.height(18.dp))
 
-            Text(
-                text = "اکبر",
-                color = Pearl.copy(alpha = 0.94f),
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Medium,
-                fontFamily = FontFamily.Serif,
-                letterSpacing = 1.sp
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = if (speaking) "در حال پاسخ‌گویی" else if (listening) "در حال گوش دادن" else "دستیار هوشمند شما",
-                color = Soft.copy(alpha = 0.72f),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Light
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "AKBAR",
+                        color = Pearl,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 3.sp
+                    )
+                    Text(
+                        text = "دستیار هوشمند",
+                        color = Soft.copy(alpha = 0.72f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Light
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Glow.copy(alpha = 0.16f))
+                        .border(1.dp, Glow.copy(alpha = 0.42f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                ) {
+                    Text(text = "AI · 1.6.1", color = Glow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
 
             Spacer(modifier = Modifier.weight(0.18f))
 
@@ -203,6 +222,16 @@ fun AssistantScreen(
                     )
                 }
             }
+
+            Text(
+                text = if (speaking) "در حال پاسخ‌گویی" else if (listening) "در حال گوش دادن" else "چه کمکی از دستم برمیاد؟",
+                color = Pearl.copy(alpha = 0.88f),
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+            )
 
             AnimatedVisibility(
                 visible = state.lastReply.isNotBlank(),
