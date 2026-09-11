@@ -23,8 +23,8 @@ data class ChatMessage(
 data class AssistantUiState(
     val state: AssistantState = AssistantState.IDLE,
     val language: AppLanguage = AppLanguage.PERSIAN,
-    val statusText: String = "بگو هی اکبر یا اکبر",
-    val hintText: String = "Say Hey Akbar / Akbar",
+    val statusText: String = "",
+    val hintText: String = "",
     val lastHeard: String = "",
     val lastReply: String = "",
     val lightOn: Boolean = false,
