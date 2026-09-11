@@ -11,8 +11,8 @@ android {
         applicationId = "com.akbar.assistant.demo"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.5-wake-hybrid"
+        versionCode = 7
+        versionName = "1.6-wake-fix"
     }
 
     buildTypes {
