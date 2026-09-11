@@ -11,8 +11,8 @@ android {
         applicationId = "com.akbar.assistant.demo"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "2.1-stable-ui"
+        versionCode = 10
+        versionName = "2.2-guardian-voice"
     }
 
     buildTypes {
