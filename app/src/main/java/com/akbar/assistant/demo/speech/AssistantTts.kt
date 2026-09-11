@@ -111,18 +111,21 @@ class AssistantTts(
         requestFocus()
 
         val preferred = if (language == AppLanguage.PERSIAN) {
-            listOf(Locale("fa", "IR"), Locale("fa"), Locale.US)
+            listOf(Locale.forLanguageTag("fa-IR"), Locale("fa", "IR"), Locale("fa"), Locale.US)
         } else {
             listOf(Locale.US, Locale.ENGLISH)
         }
         var chosen = Locale.US
         for (locale in preferred) {
-            if (engine.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE) {
+            val avail = engine.isLanguageAvailable(locale)
+            if (avail >= TextToSpeech.LANG_AVAILABLE) {
                 chosen = locale
                 break
             }
         }
         engine.language = chosen
+        // Slightly slower for clearer Persian time/weather sentences.
+        engine.setSpeechRate(if (language == AppLanguage.PERSIAN) 0.92f else 0.96f)
 
         val utteranceId = UUID.randomUUID().toString()
         val params = Bundle().apply {
