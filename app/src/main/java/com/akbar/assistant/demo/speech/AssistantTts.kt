@@ -10,22 +10,23 @@ import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import com.akbar.assistant.demo.AppLanguage
 import java.util.Locale
 import java.util.UUID
 
 /**
- * Reliable spoken replies for the demo:
- * - Prefer Google TTS engine
- * - Always play on STREAM_MUSIC with USAGE_MEDIA (audible on speakers)
- * - Request transient audio focus
- * - Unmute / raise music volume if needed
- * - Queue speech until the engine is ready
+ * Spoken replies for the demo:
+ * - Prefer Google TTS
+ * - STREAM_MUSIC + USAGE_MEDIA (audible on speakers)
+ * - Prefer any Persian (fa*) voice; if missing, notify UI to install language pack
+ * - Do not fall back to English for Persian text (often silent)
  */
 class AssistantTts(
     context: Context,
     private val onSpeakStart: () -> Unit = {},
-    private val onSpeakDone: () -> Unit = {}
+    private val onSpeakDone: () -> Unit = {},
+    private val onPersianVoiceMissing: () -> Unit = {},
 ) : TextToSpeech.OnInitListener {
 
     private val appContext = context.applicationContext
@@ -40,6 +41,7 @@ class AssistantTts(
     private var hasFocus = false
     private var readyWait: Runnable? = null
     private var safetyDone: Runnable? = null
+    private var persianMissingNotified = false
 
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) {
@@ -47,7 +49,6 @@ class AssistantTts(
                 tts?.shutdown()
             } catch (_: Exception) {
             }
-            // Device default engine fallback
             tts = TextToSpeech(appContext) { fallbackStatus ->
                 ready = fallbackStatus == TextToSpeech.SUCCESS
                 if (ready) {
@@ -66,12 +67,11 @@ class AssistantTts(
 
     private fun configureEngine() {
         val engine = tts ?: return
-        // USAGE_MEDIA + STREAM_MUSIC is the most reliable audible path on phones.
         engine.setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build()
+                .build(),
         )
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
@@ -99,9 +99,29 @@ class AssistantTts(
         })
         engine.setSpeechRate(0.94f)
         engine.setPitch(1.0f)
-        // Warm locales; ignore missing-data results here.
-        engine.setLanguage(Locale.forLanguageTag("fa-IR"))
-        engine.setLanguage(Locale.US)
+        checkPersianAvailability(engine)
+    }
+
+    private fun checkPersianAvailability(engine: TextToSpeech) {
+        val avail = try {
+            engine.isLanguageAvailable(Locale.forLanguageTag("fa-IR"))
+        } catch (_: Exception) {
+            TextToSpeech.LANG_NOT_SUPPORTED
+        }
+        val hasFaVoice = runCatching {
+            engine.voices?.any { isPersianVoice(it) } == true
+        }.getOrDefault(false)
+        if (!hasFaVoice &&
+            (avail == TextToSpeech.LANG_MISSING_DATA || avail < TextToSpeech.LANG_AVAILABLE)
+        ) {
+            notifyPersianMissing()
+        }
+    }
+
+    private fun notifyPersianMissing() {
+        if (persianMissingNotified) return
+        persianMissingNotified = true
+        mainHandler.post { onPersianVoiceMissing() }
     }
 
     private fun flushPending() {
@@ -134,55 +154,18 @@ class AssistantTts(
         prepareAudibleOutput()
         requestFocus()
 
-        val locales = if (language == AppLanguage.PERSIAN) {
-            listOf(
-                Locale.forLanguageTag("fa-IR"),
-                Locale("fa", "IR"),
-                Locale("fa"),
-                Locale.US
-            )
-        } else {
-            listOf(Locale.US, Locale.ENGLISH, Locale.forLanguageTag("en-US"))
+        val persianOk = applyVoice(engine, language)
+        if (language == AppLanguage.PERSIAN && !persianOk) {
+            notifyPersianMissing()
         }
-        var chosen = Locale.US
-        for (locale in locales) {
-            val code = try {
-                engine.isLanguageAvailable(locale)
-            } catch (_: Exception) {
-                TextToSpeech.LANG_NOT_SUPPORTED
-            }
-            if (code >= TextToSpeech.LANG_AVAILABLE) {
-                chosen = locale
-                break
-            }
-        }
-        try {
-            engine.language = chosen
-        } catch (_: Exception) {
-        }
-        // Prefer an offline voice when possible.
-        try {
-            val voices = engine.voices
-            if (voices != null) {
-                val match = voices.firstOrNull { voice ->
-                    !voice.isNetworkConnectionRequired &&
-                        voice.locale.language.equals(chosen.language, ignoreCase = true)
-                } ?: voices.firstOrNull {
-                    it.locale.language.equals(chosen.language, ignoreCase = true)
-                }
-                if (match != null) engine.voice = match
-            }
-        } catch (_: Exception) {
-        }
-        engine.setSpeechRate(if (language == AppLanguage.PERSIAN) 0.88f else 0.94f)
 
-        // Ensure media attributes right before speaking (some OEMs reset them).
         engine.setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build()
+                .build(),
         )
+        engine.setSpeechRate(if (language == AppLanguage.PERSIAN) 0.88f else 0.94f)
 
         mainHandler.post { onSpeakStart() }
 
@@ -193,7 +176,6 @@ class AssistantTts(
             putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
         }
 
-        // Safety: if utterance callbacks never fire, still resume listening.
         clearSafetyDone()
         val estimatedMs = (text.length * 70L).coerceIn(2500L, 20000L)
         val safety = Runnable {
@@ -210,7 +192,13 @@ class AssistantTts(
         }
 
         if (result == TextToSpeech.ERROR) {
-            // Last-resort retry on default locale / media stream.
+            if (language == AppLanguage.PERSIAN) {
+                notifyPersianMissing()
+                clearSafetyDone()
+                abandonFocus()
+                mainHandler.post { onSpeakDone() }
+                return
+            }
             try {
                 engine.language = Locale.US
                 val retryId = UUID.randomUUID().toString()
@@ -229,14 +217,84 @@ class AssistantTts(
         }
     }
 
+    /**
+     * @return true if a usable voice/locale was applied for the requested language
+     */
+    private fun applyVoice(engine: TextToSpeech, language: AppLanguage): Boolean {
+        val voices = runCatching { engine.voices }.getOrNull().orEmpty()
+
+        if (language == AppLanguage.PERSIAN) {
+            val offlineFa = voices.firstOrNull { isPersianVoice(it) && !it.isNetworkConnectionRequired }
+            val anyFa = voices.firstOrNull { isPersianVoice(it) }
+            when {
+                offlineFa != null -> {
+                    engine.voice = offlineFa
+                    return true
+                }
+                anyFa != null -> {
+                    engine.voice = anyFa
+                    return true
+                }
+            }
+            for (locale in listOf(
+                Locale.forLanguageTag("fa-IR"),
+                Locale("fa", "IR"),
+                Locale("fa"),
+            )) {
+                val code = try {
+                    engine.isLanguageAvailable(locale)
+                } catch (_: Exception) {
+                    TextToSpeech.LANG_NOT_SUPPORTED
+                }
+                if (code >= TextToSpeech.LANG_AVAILABLE) {
+                    try {
+                        engine.language = locale
+                    } catch (_: Exception) {
+                    }
+                    return true
+                }
+                // LANG_MISSING_DATA (-1) or NOT_SUPPORTED (-2): keep looking / fail
+                if (code == TextToSpeech.LANG_MISSING_DATA) {
+                    return false
+                }
+            }
+            return false
+        }
+
+        val offlineEn = voices.firstOrNull {
+            it.locale.language.equals("en", ignoreCase = true) && !it.isNetworkConnectionRequired
+        }
+        val anyEn = voices.firstOrNull {
+            it.locale.language.equals("en", ignoreCase = true)
+        }
+        when {
+            offlineEn != null -> engine.voice = offlineEn
+            anyEn != null -> engine.voice = anyEn
+            else -> {
+                try {
+                    engine.language = Locale.US
+                } catch (_: Exception) {
+                }
+            }
+        }
+        return true
+    }
+
+    private fun isPersianVoice(voice: Voice): Boolean =
+        voice.locale.language.equals("fa", ignoreCase = true)
+
     private fun prepareAudibleOutput() {
         try {
+            runCatching {
+                audioManager.mode = AudioManager.MODE_NORMAL
+                audioManager.isSpeakerphoneOn = true
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 if (audioManager.isStreamMute(AudioManager.STREAM_MUSIC)) {
                     audioManager.adjustStreamVolume(
                         AudioManager.STREAM_MUSIC,
                         AudioManager.ADJUST_UNMUTE,
-                        0
+                        0,
                     )
                 }
             }
@@ -246,13 +304,8 @@ class AssistantTts(
                 audioManager.setStreamVolume(
                     AudioManager.STREAM_MUSIC,
                     (max * 0.6f).toInt().coerceAtLeast(1),
-                    0
+                    0,
                 )
-            }
-            // Exit silent ringer mode does not mute media, but some OEMs couple them.
-            @Suppress("DEPRECATION")
-            if (audioManager.ringerMode == AudioManager.RINGER_MODE_SILENT) {
-                // Do not change ringer; media should still play. Volume raise above is enough.
             }
         } catch (_: Exception) {
         }
@@ -266,7 +319,7 @@ class AssistantTts(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
+                        .build(),
                 )
                 .setOnAudioFocusChangeListener { }
                 .setAcceptsDelayedFocusGain(false)
@@ -278,7 +331,7 @@ class AssistantTts(
             hasFocus = audioManager.requestAudioFocus(
                 null,
                 AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
             ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         }
     }
