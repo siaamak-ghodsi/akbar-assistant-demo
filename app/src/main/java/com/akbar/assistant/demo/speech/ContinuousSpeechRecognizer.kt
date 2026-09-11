@@ -102,7 +102,7 @@ class ContinuousSpeechRecognizer(
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) = onReady()
         override fun onBeginningOfSpeech() = Unit
-        override fun onRmsChanged(rmsdB: Float) = onRmsChanged(rmsdB)
+        override fun onRmsChanged(rmsdB: Float) = this@ContinuousSpeechRecognizer.onRmsChanged(rmsdB)
         override fun onBufferReceived(buffer: ByteArray?) = Unit
         override fun onEndOfSpeech() {
             listening = false
