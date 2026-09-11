@@ -1,68 +1,43 @@
+# Based on / adapted from
+
+This demo reuses well-known open-source patterns instead of inventing speech plumbing from scratch:
+
+1. **[StephenVinouze/KontinuousSpeechRecognizer](https://github.com/StephenVinouze/KontinuousSpeechRecognizer)** — continuous `SpeechRecognizer` restart loop + wake-keyword gate (adapted to detect «هی اکبر» / "Hey Akbar").
+2. **[Android SpeechRecognizer API](https://developer.android.com/reference/android/speech/SpeechRecognizer)** + common continuous-listening restart pattern (restart after `onResults` / `ERROR_NO_MATCH` / timeout).
+3. **Android `TextToSpeech`** official API for bilingual `fa-IR` / `en-US` replies.
+4. **Jetpack Compose Material 3** dark UI (official Android samples / Compose BOM).
+
+Only the bilingual command set, wake phrases, bulb UI, and Test Mode are custom for this demo.
+
+---
+
 # How to open and run (Android Studio)
 
-1. Install **Android Studio Hedgehog or newer** (Android SDK 34).
-2. Clone: `git clone https://github.com/siaamak-ghodsi/akbar-assistant-demo.git`
-3. **File → Open** the project root (`akbar-assistant-demo`).
-4. Let Gradle sync finish (Android Studio downloads the Gradle wrapper JAR automatically if missing).
-5. Use a **physical device** or an emulator with **Google Play** (speech recognition needs it).
-6. Click **Run ▶**, allow **Microphone** permission.
-7. Say **«هی اکبر»** or **"Hey Akbar"**, then a command — or open **Test Mode** to run all commands without voice.
+1. Install **Android Studio Hedgehog or newer** (SDK 34).
+2. `git clone https://github.com/siaamak-ghodsi/akbar-assistant-demo.git`
+3. **File → Open** → select the project root.
+4. Wait for Gradle sync (wrapper JAR is included).
+5. Use a **device/emulator with Google Play** (speech needs it). Grant **Microphone**.
+6. Run ▶ `app`.
+7. Say **«هی اکبر»** or **"Hey Akbar"**, then a command — or tap **Test Mode**.
 
 ---
 
 # Akbar Assistant (اکبر دستیار)
 
-Bilingual (Persian + English) Android voice assistant demo — **Kotlin + Jetpack Compose**.
-
-## Features
-
-- Wake words: `هی اکبر` / `Hey Akbar` (continuous `SpeechRecognizer`)
-- Commands in both languages: time, mock weather, light on/off
-- TTS replies in `fa-IR` or `en-US` matching the user language
-- Dark UI: status text, waveform listening indicator, FA/EN badge, bulb visual, last heard text, **Test Mode**
-
-## Requirements
+Bilingual Persian + English voice assistant demo — Kotlin + Jetpack Compose.
 
 | Item | Value |
 |------|-------|
 | Package | `com.akbar.assistant.demo` |
-| Min SDK | 26 |
-| Target / Compile SDK | 34 |
+| Min / Target SDK | 26 / 34 |
 | Permission | `RECORD_AUDIO` |
 
-## Supported phrases
+## Wake
+- FA: هی اکبر  
+- EN: Hey Akbar  
 
-### Wake
-- FA: هی اکبر
-- EN: Hey Akbar
-
-### Time
-- FA: ساعت چنده؟ / ساعت چند است؟
-- EN: What time is it? / What's the time?
-
-### Weather (mock)
-- FA: هوا چطوره؟ / وضعیت هوا
-- EN: What's the weather? / How's the weather?
-
-### Light
-- FA: چراغ رو روشن کن / چراغ روشن / چراغ رو خاموش کن
-- EN: Turn on the light / Turn off the light / Light on / Light off
-
-## Project structure
-
-```
-app/src/main/java/com/akbar/assistant/demo/
-  MainActivity.kt
-  AssistantViewModel.kt
-  Models.kt
-  commands/CommandParser.kt
-  speech/ContinuousSpeechRecognizer.kt
-  speech/AssistantTts.kt
-  ui/AssistantScreen.kt
-```
-
-## Notes
-
-- Speech recognition usually needs network (Google speech service).
-- Install a Persian TTS voice on the device if `fa-IR` is missing.
-- Emulators without Google Play may not support `SpeechRecognizer`.
+## Commands
+- **Time** — ساعت چنده؟ / What time is it?
+- **Weather (mock)** — هوا چطوره؟ / What's the weather?
+- **Light** — چراغ رو روشن/خاموش کن / Turn on/off the light
