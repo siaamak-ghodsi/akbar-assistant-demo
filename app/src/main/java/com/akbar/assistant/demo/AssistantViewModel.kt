@@ -39,13 +39,17 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     val uiState: StateFlow<AssistantUiState> = _uiState.asStateFlow()
 
     private val flashlight = FlashlightController(application)
-
     private var speech: ContinuousSpeechRecognizer? = null
     private var tts: AssistantTts? = null
+
     private var commandTimeoutJob: Job? = null
     private var activated = false
-    private var speaking = false
     private var awaitingCommand = false
+    private var speaking = false
+    /** After activation prompt finishes, listen for a command. */
+    private var resumeCommandAfterSpeak = false
+    /** After command reply finishes, return to wake listening. */
+    private var returnToWakeAfterSpeak = false
 
     init {
         tts = AssistantTts(
@@ -57,12 +61,20 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             },
             onSpeakDone = {
                 speaking = false
-                if (awaitingCommand && activated) {
-                    startCommandListening()
-                } else {
-                    awaitingCommand = false
-                    activated = false
-                    enterWakeMode(_uiState.value.language)
+                when {
+                    resumeCommandAfterSpeak -> {
+                        resumeCommandAfterSpeak = false
+                        startCommandListening()
+                    }
+                    returnToWakeAfterSpeak -> {
+                        returnToWakeAfterSpeak = false
+                        activated = false
+                        awaitingCommand = false
+                        enterWakeMode(_uiState.value.language)
+                    }
+                    else -> {
+                        if (!activated) enterWakeMode(_uiState.value.language)
+                    }
                 }
             }
         )
@@ -79,6 +91,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if (micGranted) {
             enterWakeMode(_uiState.value.language)
         } else {
+            speech?.stop()
             _uiState.update {
                 it.copy(
                     state = AssistantState.IDLE,
@@ -101,17 +114,17 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun runTestCommand(command: AssistantCommand) {
         viewModelScope.launch {
             val language = languageOf(command)
-            val heard = samplePhrase(command)
+            activated = true
+            awaitingCommand = true
             _uiState.update {
                 it.copy(
                     language = language,
-                    lastHeard = heard,
+                    lastHeard = samplePhrase(command),
                     state = AssistantState.PROCESSING,
-                    statusText = if (language == AppLanguage.PERSIAN) "در حال پردازش..." else "Processing...",
-                    hintText = heard
+                    statusText = if (language == AppLanguage.PERSIAN) "در حال پردازش..." else "Processing..."
                 )
             }
-            delay(180)
+            delay(120)
             executeCommand(command)
         }
     }
@@ -124,6 +137,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private fun enterWakeMode(language: AppLanguage) {
         activated = false
         awaitingCommand = false
+        resumeCommandAfterSpeak = false
+        returnToWakeAfterSpeak = false
         ensureSpeech()
         speech?.setPreferredLocale(Locale("fa", "IR"))
         speech?.start()
@@ -132,7 +147,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 state = AssistantState.LISTENING_WAKE,
                 language = language,
                 statusText = if (language == AppLanguage.PERSIAN) "بگو هی اکبر" else "Say Hey Akbar",
-                hintText = if (language == AppLanguage.PERSIAN) "Say Hey Akbar" else "بگو هی اکبر"
+                hintText = if (language == AppLanguage.PERSIAN) {
+                    "Say Hey Akbar"
+                } else {
+                    "بگو هی اکبر"
+                },
+                errorMessage = null
             )
         }
     }
@@ -160,12 +180,15 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             },
             onError = { message ->
-                if (message.contains("permission", ignoreCase = true)) {
+                if (message.contains("permission", ignoreCase = true) ||
+                    message.contains("network", ignoreCase = true) ||
+                    message.contains("available", ignoreCase = true)
+                ) {
                     _uiState.update { it.copy(errorMessage = message) }
                 }
             },
-            rmsCallback = { rms ->
-                _uiState.update { it.copy(rmsLevel = (rms / 10f).coerceIn(0f, 1f)) }
+            rmsCallback = { level ->
+                _uiState.update { it.copy(rmsLevel = level) }
             }
         )
     }
@@ -176,28 +199,44 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         awaitingCommand = true
         commandTimeoutJob?.cancel()
 
+        // If wake + command arrived together: "هی اکبر ساعت چنده"
+        val leftover = CommandParser.stripWakeWord(heard)
+        val combinedCommand = if (leftover.isNotBlank() && leftover.split(" ").size >= 2) {
+            CommandParser.parse(heard)
+        } else {
+            null
+        }
+
         _uiState.update {
             it.copy(
                 language = language,
                 lastHeard = heard,
                 state = AssistantState.ACTIVATED,
-                statusText = if (language == AppLanguage.PERSIAN) "گوش می‌دم..." else "Listening...",
+                statusText = if (language == AppLanguage.PERSIAN) "بله..." else "Yes...",
                 hintText = if (language == AppLanguage.PERSIAN) {
-                    "ساعت، هوا، یا چراغ‌قوه را بگو"
+                    "ساعت، هوا، یا چراغ‌قوه"
                 } else {
-                    "Ask for time, weather, or flashlight"
+                    "Time, weather, or flashlight"
                 },
                 errorMessage = null
             )
         }
 
+        speech?.pause()
+
+        if (combinedCommand != null && combinedCommand !is AssistantCommand.Unknown) {
+            executeCommand(combinedCommand)
+            return
+        }
+
         val prompt = ResponseBuilder.activationPrompt(language)
         _uiState.update { it.copy(lastReply = prompt) }
-        speech?.pause()
+        resumeCommandAfterSpeak = true
+        returnToWakeAfterSpeak = false
         tts?.speak(prompt, language)
 
         commandTimeoutJob = viewModelScope.launch {
-            delay(12_000)
+            delay(15_000)
             if (activated && awaitingCommand && !speaking) {
                 awaitingCommand = false
                 activated = false
@@ -211,7 +250,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update {
             it.copy(
                 state = AssistantState.LISTENING_COMMAND,
-                statusText = if (it.language == AppLanguage.PERSIAN) "گوش می‌دم..." else "Listening...",
+                statusText = if (it.language == AppLanguage.PERSIAN) "گوش می‌کنم..." else "Listening...",
                 hintText = if (it.language == AppLanguage.PERSIAN) {
                     "دستورت را بگو"
                 } else {
@@ -230,9 +269,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun handleCommand(text: String) {
         val stripped = CommandParser.stripWakeWord(text)
-        if (stripped.isBlank() || (CommandParser.containsWakeWord(text) && stripped.split(" ").size <= 1)) {
-            return
-        }
+        // Ignore bare wake-word echoes while waiting for a command.
+        if (stripped.isBlank()) return
+        if (CommandParser.containsWakeWord(text) && stripped.split(" ").size <= 1) return
+
         commandTimeoutJob?.cancel()
         awaitingCommand = false
         speech?.pause()
@@ -258,19 +298,15 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
         when (command) {
             is AssistantCommand.LightOn -> {
-                when (val result = flashlight.setEnabled(true)) {
+                when (flashlight.setEnabled(true)) {
                     FlashlightController.Result.ON -> {
                         nextLight = true
-                        reply = if (language == AppLanguage.PERSIAN) {
-                            "چراغ‌قوه روشن شد"
-                        } else {
-                            "Flashlight is on"
-                        }
+                        reply = if (language == AppLanguage.PERSIAN) "چراغ‌قوه روشن شد" else "Flashlight is on"
                     }
                     FlashlightController.Result.NO_PERMISSION -> {
                         nextLight = false
                         reply = if (language == AppLanguage.PERSIAN) {
-                            "برای روشن کردن چراغ‌قوه، دسترسی دوربین لازم است"
+                            "برای چراغ‌قوه، دسترسی دوربین لازم است"
                         } else {
                             "Camera permission is required for the flashlight"
                         }
@@ -297,18 +333,14 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
             is AssistantCommand.LightOff -> {
-                when (val result = flashlight.setEnabled(false)) {
+                when (flashlight.setEnabled(false)) {
                     FlashlightController.Result.OFF -> {
                         nextLight = false
-                        reply = if (language == AppLanguage.PERSIAN) {
-                            "چراغ‌قوه خاموش شد"
-                        } else {
-                            "Flashlight is off"
-                        }
+                        reply = if (language == AppLanguage.PERSIAN) "چراغ‌قوه خاموش شد" else "Flashlight is off"
                     }
                     FlashlightController.Result.NO_PERMISSION -> {
                         reply = if (language == AppLanguage.PERSIAN) {
-                            "برای کنترل چراغ‌قوه، دسترسی دوربین لازم است"
+                            "برای چراغ‌قوه، دسترسی دوربین لازم است"
                         } else {
                             "Camera permission is required for the flashlight"
                         }
@@ -336,8 +368,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             else -> Unit
         }
 
-        activated = false
+        // Keep mic paused; return to wake only after the spoken reply finishes.
         awaitingCommand = false
+        resumeCommandAfterSpeak = false
+        returnToWakeAfterSpeak = true
 
         _uiState.update {
             it.copy(
@@ -346,7 +380,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 language = language,
                 statusText = reply,
                 hintText = if (language == AppLanguage.PERSIAN) "دوباره بگو هی اکبر" else "Say Hey Akbar again",
-                errorMessage = error
+                errorMessage = error,
+                state = AssistantState.SPEAKING
             )
         }
         tts?.speak(reply, language)
