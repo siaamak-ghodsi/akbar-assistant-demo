@@ -101,28 +101,32 @@ object CommandParser {
 
     private fun isLightOn(n: String, language: AppLanguage): Boolean {
         return if (language == AppLanguage.PERSIAN) {
-            (n.contains("چراغ") || n.contains("لامپ") || n.contains("نور") || n.contains("چراغ‌ها")) &&
+            (n.contains("چراغ") || n.contains("لامپ") || n.contains("نور") ||
+                n.contains("چراغ قوه") || n.contains("چراغ‌قوه") || n.contains("فلش")) &&
                 (n.contains("روشن") || n.contains("باز"))
         } else {
             val mentionsLight = n.contains("light") || n.contains("lights") ||
-                n.contains("lamp") || n.contains("bulb")
+                n.contains("lamp") || n.contains("bulb") ||
+                n.contains("flashlight") || n.contains("torch") || n.contains("flash")
             val wantsOn = n.contains("turn on") || n.contains("switch on") ||
                 n.contains("enable") || Regex("\\bon\\b").containsMatchIn(n) ||
-                n == "light on" || n.endsWith(" on")
+                n.contains("light on") || n.endsWith(" on")
             mentionsLight && wantsOn && !n.contains("off")
         }
     }
 
     private fun isLightOff(n: String, language: AppLanguage): Boolean {
         return if (language == AppLanguage.PERSIAN) {
-            (n.contains("چراغ") || n.contains("لامپ") || n.contains("نور") || n.contains("چراغ‌ها")) &&
+            (n.contains("چراغ") || n.contains("لامپ") || n.contains("نور") ||
+                n.contains("چراغ قوه") || n.contains("چراغ‌قوه") || n.contains("فلش")) &&
                 (n.contains("خاموش") || n.contains("ببند") || n.contains("قطع") || n.contains("بسته"))
         } else {
             val mentionsLight = n.contains("light") || n.contains("lights") ||
-                n.contains("lamp") || n.contains("bulb")
+                n.contains("lamp") || n.contains("bulb") ||
+                n.contains("flashlight") || n.contains("torch") || n.contains("flash")
             val wantsOff = n.contains("turn off") || n.contains("switch off") ||
                 n.contains("disable") || Regex("\\boff\\b").containsMatchIn(n) ||
-                n == "light off" || n.endsWith(" off")
+                n.contains("light off") || n.endsWith(" off")
             mentionsLight && wantsOff
         }
     }

@@ -20,7 +20,7 @@ class ContinuousSpeechRecognizer(
     private val onPartialResult: (String) -> Unit,
     private val onFinalResult: (String) -> Unit,
     private val onError: (String) -> Unit = {},
-    private val onRmsChanged: (Float) -> Unit = {}
+    private val rmsCallback: (Float) -> Unit = {}
 ) {
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
@@ -129,7 +129,7 @@ class ContinuousSpeechRecognizer(
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) = Unit
         override fun onBeginningOfSpeech() = Unit
-        override fun onRmsChanged(rmsdB: Float) = onRmsChanged(rmsdB)
+        override fun onRmsChanged(rmsdB: Float) = rmsCallback(rmsdB)
         override fun onBufferReceived(buffer: ByteArray?) = Unit
         override fun onEndOfSpeech() {
             listening = false
