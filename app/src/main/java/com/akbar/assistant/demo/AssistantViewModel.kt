@@ -21,6 +21,7 @@ data class AssistantUiState(
     val state: AssistantState = AssistantState.IDLE,
     val language: AppLanguage = AppLanguage.PERSIAN,
     val statusText: String = "بگو هی اکبر",
+    val hintText: String = "Say Hey Akbar",
     val lastHeard: String = "",
     val lastReply: String = "",
     val lightOn: Boolean = false,
@@ -40,36 +41,40 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private var commandTimeoutJob: Job? = null
     private var activated = false
     private var speaking = false
+    private var awaitingCommand = false
 
     init {
         tts = AssistantTts(
             context = application,
             onSpeakStart = {
                 speaking = true
+                speech?.pause()
                 _uiState.update { it.copy(state = AssistantState.SPEAKING) }
             },
             onSpeakDone = {
                 speaking = false
-                if (activated) {
-                    resumeCommandListening()
+                if (awaitingCommand && activated) {
+                    startCommandListening()
                 } else {
-                    setWakeStatus(_uiState.value.language)
-                    restartWakeListening()
+                    awaitingCommand = false
+                    activated = false
+                    enterWakeMode(_uiState.value.language)
                 }
             }
         )
     }
 
     fun onPermissionResult(granted: Boolean) {
-        _uiState.update { it.copy(permissionGranted = granted) }
+        _uiState.update { it.copy(permissionGranted = granted, errorMessage = null) }
         if (granted) {
-            startWakeListening()
+            enterWakeMode(_uiState.value.language)
         } else {
             _uiState.update {
                 it.copy(
                     state = AssistantState.IDLE,
-                    statusText = "Microphone permission required / دسترسی میکروفون لازم است",
-                    errorMessage = "RECORD_AUDIO permission denied"
+                    statusText = "دسترسی میکروفون لازم است",
+                    hintText = "Microphone permission required",
+                    errorMessage = "RECORD_AUDIO denied"
                 )
             }
         }
@@ -85,47 +90,35 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun runTestCommand(command: AssistantCommand) {
         viewModelScope.launch {
-            val heard = when (command) {
-                is AssistantCommand.TellTime ->
-                    if (command.language == AppLanguage.PERSIAN) "ساعت چنده؟" else "What time is it?"
-                is AssistantCommand.Weather ->
-                    if (command.language == AppLanguage.PERSIAN) "هوا چطوره؟" else "What's the weather?"
-                is AssistantCommand.LightOn ->
-                    if (command.language == AppLanguage.PERSIAN) "چراغ رو روشن کن" else "Turn on the light"
-                is AssistantCommand.LightOff ->
-                    if (command.language == AppLanguage.PERSIAN) "چراغ رو خاموش کن" else "Turn off the light"
-                is AssistantCommand.Unknown -> command.raw
-            }
             val language = languageOf(command)
+            val heard = samplePhrase(command)
             _uiState.update {
                 it.copy(
                     language = language,
                     lastHeard = heard,
                     state = AssistantState.PROCESSING,
-                    statusText = statusFor(AssistantState.PROCESSING, language)
+                    statusText = if (language == AppLanguage.PERSIAN) "در حال پردازش..." else "Processing...",
+                    hintText = heard
                 )
             }
-            delay(200)
-            executeCommand(command, fromVoice = false)
+            delay(180)
+            executeCommand(command)
         }
     }
 
-    private fun startWakeListening() {
+    private fun enterWakeMode(language: AppLanguage) {
         activated = false
-        setWakeStatus(_uiState.value.language)
+        awaitingCommand = false
         ensureSpeech()
         speech?.setPreferredLocale(Locale("fa", "IR"))
         speech?.start()
-        _uiState.update { it.copy(state = AssistantState.LISTENING_WAKE) }
-    }
-
-    private fun restartWakeListening() {
-        speech?.stop()
-        viewModelScope.launch {
-            delay(200)
-            if (_uiState.value.permissionGranted && !activated) {
-                startWakeListening()
-            }
+        _uiState.update {
+            it.copy(
+                state = AssistantState.LISTENING_WAKE,
+                language = language,
+                statusText = if (language == AppLanguage.PERSIAN) "بگو هی اکبر" else "Say Hey Akbar",
+                hintText = if (language == AppLanguage.PERSIAN) "Say Hey Akbar" else "بگو هی اکبر"
+            )
         }
     }
 
@@ -135,17 +128,18 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             context = getApplication(),
             onPartialResult = { text ->
                 _uiState.update { it.copy(lastHeard = text) }
-                if (!activated && CommandParser.containsWakeWord(text)) {
+                if (!activated && !speaking && CommandParser.containsWakeWord(text)) {
                     onWakeDetected(CommandParser.wakeLanguage(text), text)
                 }
             },
             onFinalResult = { text ->
                 _uiState.update { it.copy(lastHeard = text) }
+                if (speaking) return@onFinalResult
                 if (!activated) {
                     if (CommandParser.containsWakeWord(text)) {
                         onWakeDetected(CommandParser.wakeLanguage(text), text)
                     }
-                } else if (!speaking) {
+                } else if (awaitingCommand) {
                     handleCommand(text)
                 }
             },
@@ -155,44 +149,58 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             },
             onRmsChanged = { rms ->
-                _uiState.update { it.copy(rmsLevel = rms.coerceIn(0f, 10f) / 10f) }
+                _uiState.update { it.copy(rmsLevel = (rms / 10f).coerceIn(0f, 1f)) }
             }
         )
     }
 
     private fun onWakeDetected(language: AppLanguage, heard: String) {
-        if (activated) return
+        if (activated || speaking) return
         activated = true
+        awaitingCommand = true
         commandTimeoutJob?.cancel()
+
         _uiState.update {
             it.copy(
                 language = language,
                 lastHeard = heard,
                 state = AssistantState.ACTIVATED,
-                statusText = statusFor(AssistantState.ACTIVATED, language),
+                statusText = if (language == AppLanguage.PERSIAN) "گوش می‌دم..." else "Listening...",
+                hintText = if (language == AppLanguage.PERSIAN) {
+                    "ساعت، هوا، یا چراغ را بگو"
+                } else {
+                    "Ask for time, weather, or light"
+                },
                 errorMessage = null
             )
         }
+
         val prompt = ResponseBuilder.activationPrompt(language)
         _uiState.update { it.copy(lastReply = prompt) }
-        speech?.stop()
+        speech?.pause()
         tts?.speak(prompt, language)
+
         commandTimeoutJob = viewModelScope.launch {
             delay(12_000)
-            if (activated) {
+            if (activated && awaitingCommand && !speaking) {
+                awaitingCommand = false
                 activated = false
-                setWakeStatus(language)
-                restartWakeListening()
+                enterWakeMode(language)
             }
         }
     }
 
-    private fun resumeCommandListening() {
-        if (!activated) return
+    private fun startCommandListening() {
+        if (!activated || !awaitingCommand) return
         _uiState.update {
             it.copy(
                 state = AssistantState.LISTENING_COMMAND,
-                statusText = statusFor(AssistantState.LISTENING_COMMAND, it.language)
+                statusText = if (it.language == AppLanguage.PERSIAN) "گوش می‌دم..." else "Listening...",
+                hintText = if (it.language == AppLanguage.PERSIAN) {
+                    "دستورت را بگو"
+                } else {
+                    "Say your command"
+                }
             )
         }
         val locale = if (_uiState.value.language == AppLanguage.PERSIAN) {
@@ -201,27 +209,33 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             Locale.US
         }
         speech?.setPreferredLocale(locale)
-        speech?.start()
+        speech?.resume()
     }
 
     private fun handleCommand(text: String) {
-        if (CommandParser.containsWakeWord(text) && text.trim().split(" ").size <= 3) return
+        val stripped = CommandParser.stripWakeWord(text)
+        // Ignore bare wake-word repeats while waiting for a real command.
+        if (stripped.isBlank() || (CommandParser.containsWakeWord(text) && stripped.split(" ").size <= 1)) {
+            return
+        }
         commandTimeoutJob?.cancel()
+        awaitingCommand = false
+        speech?.pause()
+
         val command = CommandParser.parse(text)
         val language = languageOf(command)
         _uiState.update {
             it.copy(
                 language = language,
+                lastHeard = text,
                 state = AssistantState.PROCESSING,
-                statusText = statusFor(AssistantState.PROCESSING, language),
-                lastHeard = text
+                statusText = if (language == AppLanguage.PERSIAN) "در حال پردازش..." else "Processing..."
             )
         }
-        speech?.stop()
-        executeCommand(command, fromVoice = true)
+        executeCommand(command)
     }
 
-    private fun executeCommand(command: AssistantCommand, fromVoice: Boolean) {
+    private fun executeCommand(command: AssistantCommand) {
         var nextLight = _uiState.value.lightOn
         when (command) {
             is AssistantCommand.LightOn -> nextLight = true
@@ -230,43 +244,20 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
         val reply = ResponseBuilder.forCommand(command)
         val language = languageOf(command)
+
+        activated = false
+        awaitingCommand = false
+
         _uiState.update {
             it.copy(
                 lightOn = nextLight,
                 lastReply = reply,
                 language = language,
-                statusText = reply
+                statusText = reply,
+                hintText = if (language == AppLanguage.PERSIAN) "دوباره بگو هی اکبر" else "Say Hey Akbar again"
             )
         }
-        activated = false
         tts?.speak(reply, language)
-        if (!fromVoice) {
-            // Keep wake listening available under test mode.
-        }
-    }
-
-    private fun setWakeStatus(language: AppLanguage) {
-        _uiState.update {
-            it.copy(
-                state = AssistantState.LISTENING_WAKE,
-                language = language,
-                statusText = statusFor(AssistantState.IDLE, language)
-            )
-        }
-    }
-
-    private fun statusFor(state: AssistantState, language: AppLanguage): String {
-        val fa = language == AppLanguage.PERSIAN
-        return when (state) {
-            AssistantState.IDLE, AssistantState.LISTENING_WAKE ->
-                if (fa) "بگو هی اکبر" else "Say Hey Akbar"
-            AssistantState.ACTIVATED, AssistantState.LISTENING_COMMAND ->
-                if (fa) "گوش می‌دم..." else "Listening..."
-            AssistantState.PROCESSING ->
-                if (fa) "در حال پردازش..." else "Processing..."
-            AssistantState.SPEAKING ->
-                if (fa) "در حال پاسخ..." else "Speaking..."
-        }
     }
 
     private fun languageOf(command: AssistantCommand): AppLanguage = when (command) {
@@ -275,6 +266,18 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         is AssistantCommand.LightOn -> command.language
         is AssistantCommand.LightOff -> command.language
         is AssistantCommand.Unknown -> command.language
+    }
+
+    private fun samplePhrase(command: AssistantCommand): String = when (command) {
+        is AssistantCommand.TellTime ->
+            if (command.language == AppLanguage.PERSIAN) "ساعت چنده؟" else "What time is it?"
+        is AssistantCommand.Weather ->
+            if (command.language == AppLanguage.PERSIAN) "هوا چطوره؟" else "What's the weather?"
+        is AssistantCommand.LightOn ->
+            if (command.language == AppLanguage.PERSIAN) "چراغ رو روشن کن" else "Turn on the light"
+        is AssistantCommand.LightOff ->
+            if (command.language == AppLanguage.PERSIAN) "چراغ رو خاموش کن" else "Turn off the light"
+        is AssistantCommand.Unknown -> command.raw
     }
 
     override fun onCleared() {
