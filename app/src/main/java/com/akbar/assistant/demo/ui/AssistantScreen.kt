@@ -100,6 +100,7 @@ fun AssistantScreen(
     onDraftChanged: (String) -> Unit,
     onSendText: () -> Unit,
     onRequestMicPermission: () -> Unit = {},
+    onInstallPersianTts: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(state.chatMessages.size) {
@@ -149,6 +150,28 @@ fun AssistantScreen(
                 Text("اجازه میکروفون")
             }
             Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        if (state.needsPersianTtsInstall) {
+            Button(
+                onClick = onInstallPersianTts,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Accent,
+                    contentColor = Color.White,
+                ),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text("نصب صدای فارسی (Google TTS)")
+            }
+            Text(
+                text = "بدون بستهٔ زبان فارسی، پاسخ‌ها شنیده نمی‌شوند",
+                color = Muted,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp),
+            )
         }
 
         // Guardian orb
