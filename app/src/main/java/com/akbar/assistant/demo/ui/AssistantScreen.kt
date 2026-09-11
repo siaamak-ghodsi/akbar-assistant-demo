@@ -196,26 +196,44 @@ fun AssistantScreen(
                 }
             }
 
-            // Captions only while awaiting / processing a command — never during quiet wake.
+            // Always show what STT heard — critical for debugging wake failures.
             AnimatedVisibility(
-                visible = state.lastHeard.isNotBlank() &&
-                    (state.state == AssistantState.LISTENING_COMMAND ||
-                        state.state == AssistantState.ACTIVATED ||
-                        state.state == AssistantState.PROCESSING),
+                visible = state.lastHeard.isNotBlank(),
                 enter = fadeIn(tween(200)),
                 exit = fadeOut(tween(220))
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Spacer(modifier = Modifier.height(22.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
                     Text(
-                        text = state.lastHeard,
-                        color = Dim,
-                        fontSize = 13.sp,
+                        text = "شنیدم: ${state.lastHeard}",
+                        color = Soft.copy(alpha = 0.9f),
+                        fontSize = 14.sp,
                         textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Light,
-                        modifier = Modifier.fillMaxWidth(0.86f)
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.fillMaxWidth(0.9f)
                     )
                 }
+            }
+
+            // Manual wake — if voice wake fails, user can still activate.
+            if (state.state == AssistantState.LISTENING_WAKE) {
+                Spacer(modifier = Modifier.height(22.dp))
+                Text(
+                    text = "بیدار کردن اکبر",
+                    color = Pearl,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Glow.copy(alpha = 0.18f))
+                        .border(1.dp, Glow.copy(alpha = 0.35f), RoundedCornerShape(999.dp))
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() },
+                            onClick = { onSimulateWake(AppLanguage.PERSIAN) }
+                        )
+                        .padding(horizontal = 22.dp, vertical = 12.dp)
+                )
             }
 
             AnimatedVisibility(
