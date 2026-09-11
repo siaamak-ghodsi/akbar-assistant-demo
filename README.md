@@ -7,7 +7,13 @@ This demo reuses well-known open-source patterns instead of inventing speech plu
 3. **Android `TextToSpeech`** official API for bilingual `fa-IR` / `en-US` replies.
 4. **Jetpack Compose Material 3** dark UI (official Android samples / Compose BOM).
 
-Only the bilingual command set, wake phrases, bulb UI, and Test Mode are custom for this demo.
+Only the bilingual command set, wake phrases, bulb status UI, and Test Mode are custom for this demo.
+
+## Latest fixes
+- Removed manual light toggle (bulb is status-only; change via voice/Test Mode)
+- Hardened wake + command parsing (more speech variants, strip wake word from command)
+- Pause mic while TTS speaks so recognition does not fight the speaker
+- Cleaner bilingual UI with clearer status/hint hierarchy
 
 ---
 

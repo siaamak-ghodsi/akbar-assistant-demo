@@ -11,7 +11,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
-import com.akbar.assistant.demo.commands.AssistantCommand
 import com.akbar.assistant.demo.ui.AkbarAssistantTheme
 import com.akbar.assistant.demo.ui.AssistantScreen
 
@@ -34,19 +33,9 @@ class MainActivity : ComponentActivity() {
             AkbarAssistantTheme {
                 AssistantScreen(
                     state = state,
-                    onToggleTestMode = { viewModel.toggleTestMode() },
-                    onSimulateWake = { language -> viewModel.simulateWake(language) },
-                    onTestCommand = { command -> viewModel.runTestCommand(command) },
-                    onToggleLightManual = {
-                        val next = !state.lightOn
-                        viewModel.runTestCommand(
-                            if (next) {
-                                AssistantCommand.LightOn(state.language)
-                            } else {
-                                AssistantCommand.LightOff(state.language)
-                            }
-                        )
-                    }
+                    onToggleTestMode = viewModel::toggleTestMode,
+                    onSimulateWake = viewModel::simulateWake,
+                    onTestCommand = viewModel::runTestCommand
                 )
             }
         }
