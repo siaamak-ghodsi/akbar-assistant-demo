@@ -1,9 +1,13 @@
 package com.akbar.assistant.demo
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.pm.PackageManager
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -76,6 +80,7 @@ class MainActivity : ComponentActivity() {
         }
 
         ensureNotificationPermission()
+        ensureFullScreenWakePermission()
         ensureMicPermission()
         handleWakeIntent(intent)
     }
@@ -122,6 +127,19 @@ class MainActivity : ComponentActivity() {
         ) == PackageManager.PERMISSION_GRANTED
         if (!granted) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun ensureFullScreenWakePermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        val notifications = getSystemService(NotificationManager::class.java)
+        if (notifications.canUseFullScreenIntent()) return
+        runCatching {
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+            )
         }
     }
 

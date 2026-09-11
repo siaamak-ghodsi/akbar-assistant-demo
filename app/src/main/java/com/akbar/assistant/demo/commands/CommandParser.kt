@@ -45,7 +45,8 @@ object CommandParser {
         val fa = listOf(
             "هی اکبر", "هی اگبر", "هی اقبر", "های اکبر", "هی اکبر جان",
             "سلام اکبر", "اکبر جان", "یا اکبر", "ای اکبر", "آهای اکبر",
-            "هی اکبره", "هی اکبر جان", "بیدار باش اکبر"
+            "هی اکبره", "هی اکبر جان", "بیدار باش اکبر", "ای اکبار", "هی اکبار",
+            "ای اگبر", "هی اقبر"
         )
         val en = listOf(
             "hey akbar", "hi akbar", "hay akbar", "he akbar",
@@ -59,15 +60,16 @@ object CommandParser {
         ) return true
 
         // Lenient: STT often returns only the name.
-        val nameOnly = n == "اکبر" || n == "akbar" || n == "akber" ||
-            n == "aqbar" || n == "اگبر" || n == "ekbar"
+        val nameOnly = n == "اکبر" || n == "اکبار" || n == "اکبرر" ||
+            n == "akbar" || n == "akber" || n == "akbaar" ||
+            n == "aqbar" || n == "اگبر" || n == "اقبر" || n == "اکبار" || n == "ekbar"
         if (nameOnly) return true
 
-        val hasFaName = n.contains("اکبر") || n.contains("اگبر") || n.contains("اقبر")
+        val hasFaName = n.contains("اکبر") || n.contains("اکبار") || n.contains("اگبر") || n.contains("اقبر")
         val hasEnName = n.contains("akbar") || n.contains("akber") ||
             n.contains("aqbar") || n.contains("ekbar")
         val hasFaCue = n.contains("هی") || n.contains("های") || n.contains("سلام") ||
-            n.contains("بیدار") || n.contains("یا ") || n.contains("آهای") ||
+            n.contains("بیدار") || n.contains("یا ") || n.contains("ای ") || n.contains("آهای") ||
             n.contains("hey") || n.contains("hi")
         val hasEnCue = n.contains("hey") || n.contains("hi ") || n.startsWith("hi") ||
             n.contains("hay") || n.contains("okay") || n.contains("ok ") ||
@@ -88,6 +90,14 @@ object CommandParser {
             "hey akber", "hey aqbar", "hey akbaar", "hey aakbar", "hey akbarr"
         )
         wakes.forEach { wake -> n = n.replace(wake, " ") }
+        // Remove common spoken variants even when STT inserts unusual spacing.
+        n = n.replace(
+            Regex("^(هی|های|ای|یا|آهای|اه|سلام|اوکی|okay|hey|hi|hay|اکبر|اکبار|اگبر|اقبر|akbar|akber|akbaar|aqbar|ekbar)(\\s+جان)?(\\s+)+"),
+            " "
+        )
+        if (n.trim() in setOf("اکبر", "اکبار", "اکبرر", "اگبر", "اقبر", "akbar", "akber", "akbaar", "aqbar", "ekbar")) {
+            n = ""
+        }
         return n.replace(Regex("\\s+"), " ").trim()
     }
 

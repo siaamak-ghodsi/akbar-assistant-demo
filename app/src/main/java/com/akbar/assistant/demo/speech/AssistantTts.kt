@@ -122,7 +122,14 @@ class AssistantTts(
                 break
             }
         }
-        engine.language = chosen
+        val languageResult = engine.setLanguage(chosen)
+        if (languageResult == TextToSpeech.LANG_MISSING_DATA ||
+            languageResult == TextToSpeech.LANG_NOT_SUPPORTED
+        ) {
+            // A Persian voice pack is not installed on every phone; English is
+            // still preferable to a silent response when that happens.
+            engine.setLanguage(Locale.US)
+        }
 
         val utteranceId = UUID.randomUUID().toString()
         val params = Bundle().apply {
@@ -132,7 +139,16 @@ class AssistantTts(
         val result = engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
         if (result == TextToSpeech.ERROR) {
             abandonFocus()
-            mainHandler.post { onSpeakDone() }
+            // Retry once after the engine has had a chance to recover from a
+            // transient audio-focus / initialization race.
+            mainHandler.postDelayed({
+                if (ready && tts != null) {
+                    requestFocus()
+                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+                } else {
+                    onSpeakDone()
+                }
+            }, 180)
         }
     }
 

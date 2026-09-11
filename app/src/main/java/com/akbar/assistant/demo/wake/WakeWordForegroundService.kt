@@ -174,11 +174,13 @@ class WakeWordForegroundService : Service() {
             .setSmallIcon(R.drawable.ic_launcher)
             .setContentTitle(getString(R.string.wake_detected_title))
             .setContentText(text)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
             .setContentIntent(fullScreen)
             .setFullScreenIntent(fullScreen, true)
+            .setTimeoutAfter(15_000L)
             .build()
         nm.notify(WAKE_EVENT_NOTIFICATION_ID, wakeNotification)
 
