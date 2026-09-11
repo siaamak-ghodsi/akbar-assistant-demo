@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.akbar.assistant.demo.commands.AssistantCommand
 import com.akbar.assistant.demo.commands.CommandParser
 import com.akbar.assistant.demo.commands.ResponseBuilder
+import com.akbar.assistant.demo.device.FlashlightController
 import com.akbar.assistant.demo.speech.AssistantTts
 import com.akbar.assistant.demo.speech.ContinuousSpeechRecognizer
 import java.util.Locale
@@ -28,6 +29,7 @@ data class AssistantUiState(
     val rmsLevel: Float = 0f,
     val errorMessage: String? = null,
     val permissionGranted: Boolean = false,
+    val cameraPermissionGranted: Boolean = false,
     val testModeVisible: Boolean = false
 )
 
@@ -35,6 +37,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _uiState = MutableStateFlow(AssistantUiState())
     val uiState: StateFlow<AssistantUiState> = _uiState.asStateFlow()
+
+    private val flashlight = FlashlightController(application)
 
     private var speech: ContinuousSpeechRecognizer? = null
     private var tts: AssistantTts? = null
@@ -64,9 +68,15 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         )
     }
 
-    fun onPermissionResult(granted: Boolean) {
-        _uiState.update { it.copy(permissionGranted = granted, errorMessage = null) }
-        if (granted) {
+    fun onPermissionsResult(micGranted: Boolean, cameraGranted: Boolean) {
+        _uiState.update {
+            it.copy(
+                permissionGranted = micGranted,
+                cameraPermissionGranted = cameraGranted,
+                errorMessage = null
+            )
+        }
+        if (micGranted) {
             enterWakeMode(_uiState.value.language)
         } else {
             _uiState.update {
@@ -104,6 +114,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             delay(180)
             executeCommand(command)
         }
+    }
+
+    fun releaseHardware() {
+        flashlight.turnOffQuietly()
+        _uiState.update { it.copy(lightOn = false) }
     }
 
     private fun enterWakeMode(language: AppLanguage) {
@@ -148,7 +163,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     _uiState.update { it.copy(errorMessage = message) }
                 }
             },
-            onRmsChanged = { rms ->
+            rmsCallback = { rms ->
                 _uiState.update { it.copy(rmsLevel = (rms / 10f).coerceIn(0f, 1f)) }
             }
         )
@@ -167,9 +182,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 state = AssistantState.ACTIVATED,
                 statusText = if (language == AppLanguage.PERSIAN) "گوش می‌دم..." else "Listening...",
                 hintText = if (language == AppLanguage.PERSIAN) {
-                    "ساعت، هوا، یا چراغ را بگو"
+                    "ساعت، هوا، یا چراغ‌قوه را بگو"
                 } else {
-                    "Ask for time, weather, or light"
+                    "Ask for time, weather, or flashlight"
                 },
                 errorMessage = null
             )
@@ -214,7 +229,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun handleCommand(text: String) {
         val stripped = CommandParser.stripWakeWord(text)
-        // Ignore bare wake-word repeats while waiting for a real command.
         if (stripped.isBlank() || (CommandParser.containsWakeWord(text) && stripped.split(" ").size <= 1)) {
             return
         }
@@ -236,14 +250,90 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun executeCommand(command: AssistantCommand) {
+        val language = languageOf(command)
         var nextLight = _uiState.value.lightOn
+        var reply = ResponseBuilder.forCommand(command)
+        var error: String? = null
+
         when (command) {
-            is AssistantCommand.LightOn -> nextLight = true
-            is AssistantCommand.LightOff -> nextLight = false
+            is AssistantCommand.LightOn -> {
+                when (val result = flashlight.setEnabled(true)) {
+                    FlashlightController.Result.ON -> {
+                        nextLight = true
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "چراغ‌قوه روشن شد"
+                        } else {
+                            "Flashlight is on"
+                        }
+                    }
+                    FlashlightController.Result.NO_PERMISSION -> {
+                        nextLight = false
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "برای روشن کردن چراغ‌قوه، دسترسی دوربین لازم است"
+                        } else {
+                            "Camera permission is required for the flashlight"
+                        }
+                        error = "CAMERA permission required"
+                    }
+                    FlashlightController.Result.NO_FLASH -> {
+                        nextLight = false
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "این دستگاه چراغ‌قوه ندارد"
+                        } else {
+                            "This device has no flashlight"
+                        }
+                        error = "No flashlight hardware"
+                    }
+                    else -> {
+                        nextLight = false
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "نتوانستم چراغ‌قوه را روشن کنم"
+                        } else {
+                            "Couldn't turn on the flashlight"
+                        }
+                        error = "Torch error"
+                    }
+                }
+            }
+            is AssistantCommand.LightOff -> {
+                when (val result = flashlight.setEnabled(false)) {
+                    FlashlightController.Result.OFF -> {
+                        nextLight = false
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "چراغ‌قوه خاموش شد"
+                        } else {
+                            "Flashlight is off"
+                        }
+                    }
+                    FlashlightController.Result.NO_PERMISSION -> {
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "برای کنترل چراغ‌قوه، دسترسی دوربین لازم است"
+                        } else {
+                            "Camera permission is required for the flashlight"
+                        }
+                        error = "CAMERA permission required"
+                    }
+                    FlashlightController.Result.NO_FLASH -> {
+                        nextLight = false
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "این دستگاه چراغ‌قوه ندارد"
+                        } else {
+                            "This device has no flashlight"
+                        }
+                    }
+                    else -> {
+                        nextLight = flashlight.isOn
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "نتوانستم چراغ‌قوه را خاموش کنم"
+                        } else {
+                            "Couldn't turn off the flashlight"
+                        }
+                        error = "Torch error"
+                    }
+                }
+            }
             else -> Unit
         }
-        val reply = ResponseBuilder.forCommand(command)
-        val language = languageOf(command)
 
         activated = false
         awaitingCommand = false
@@ -254,7 +344,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 lastReply = reply,
                 language = language,
                 statusText = reply,
-                hintText = if (language == AppLanguage.PERSIAN) "دوباره بگو هی اکبر" else "Say Hey Akbar again"
+                hintText = if (language == AppLanguage.PERSIAN) "دوباره بگو هی اکبر" else "Say Hey Akbar again",
+                errorMessage = error
             )
         }
         tts?.speak(reply, language)
@@ -283,6 +374,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     override fun onCleared() {
         super.onCleared()
         commandTimeoutJob?.cancel()
+        flashlight.turnOffQuietly()
         speech?.destroy()
         tts?.shutdown()
     }
