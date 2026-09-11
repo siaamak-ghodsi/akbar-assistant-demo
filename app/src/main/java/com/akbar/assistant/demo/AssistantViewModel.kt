@@ -327,7 +327,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
         resumeCommandAfterSpeak = true
         returnToWakeAfterSpeak = false
-        tts?.speak(prompt, language)
+        speakReply(prompt, language)
         armSessionTimeout(language)
     }
 
@@ -370,7 +370,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 appendChat(fromUser = false, prompt)
                 _uiState.update { it.copy(lastReply = prompt, statusText = prompt) }
                 resumeCommandAfterSpeak = true
-                tts?.speak(prompt, _uiState.value.language)
+                speakReply(prompt, _uiState.value.language)
             }
             return
         }
@@ -501,7 +501,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }
         // Always speak — including longer weather replies.
-        tts?.speak(reply, language)
+        speakReply(reply, language)
         armSessionTimeout(language)
     }
 
@@ -526,6 +526,16 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 enterWakeMode(language)
             }
+        }
+    }
+
+
+    private fun speakReply(text: String, language: AppLanguage) {
+        if (text.isBlank()) return
+        try {
+            tts?.speak(text, language)
+        } catch (e: Exception) {
+            _uiState.update { it.copy(errorMessage = e.message) }
         }
     }
 
