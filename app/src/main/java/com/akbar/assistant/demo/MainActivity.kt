@@ -44,7 +44,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state by viewModel.uiState.collectAsState()
 
-            // Ask for camera only when a torch command needs it.
             LaunchedEffect(state.needsCameraPermission) {
                 if (state.needsCameraPermission && !state.cameraPermissionGranted) {
                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -57,9 +56,11 @@ class MainActivity : ComponentActivity() {
                     onToggleTestMode = viewModel::toggleTestMode,
                     onSimulateWake = viewModel::simulateWake,
                     onTestCommand = viewModel::runTestCommand,
+                    onDraftChanged = viewModel::onDraftChanged,
+                    onSendText = viewModel::sendTextCommand,
                     onRequestMicPermission = {
                         micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    }
+                    },
                 )
             }
         }
