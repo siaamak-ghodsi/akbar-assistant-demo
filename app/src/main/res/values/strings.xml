@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Akbar Assistant (اکبر دستیار)</string>
+    <string name="wake_channel_name">Wake listening</string>
+    <string name="wake_channel_desc">Keeps Akbar listening for «هی اکبر» / Hey Akbar in the background</string>
+    <string name="wake_alert_channel_name">Wake alerts</string>
+    <string name="wake_alert_channel_desc">Shown when Akbar hears the wake word</string>
+    <string name="wake_service_title">Akbar is listening</string>
+    <string name="wake_service_text">Say «هی اکبر» or “Hey Akbar”</string>
+    <string name="wake_service_paused_text">Wake listening paused</string>
+    <string name="wake_detected_title">Akbar heard you</string>
 </resources>
