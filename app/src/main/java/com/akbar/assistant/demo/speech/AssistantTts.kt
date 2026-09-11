@@ -21,22 +21,11 @@ class AssistantTts(
         ready = status == TextToSpeech.SUCCESS
         if (ready) {
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {
-                    onSpeakStart()
-                }
-
-                override fun onDone(utteranceId: String?) {
-                    onSpeakDone()
-                }
-
+                override fun onStart(utteranceId: String?) = onSpeakStart()
+                override fun onDone(utteranceId: String?) = onSpeakDone()
                 @Deprecated("Deprecated in Java")
-                override fun onError(utteranceId: String?) {
-                    onSpeakDone()
-                }
-
-                override fun onError(utteranceId: String?, errorCode: Int) {
-                    onSpeakDone()
-                }
+                override fun onError(utteranceId: String?) = onSpeakDone()
+                override fun onError(utteranceId: String?, errorCode: Int) = onSpeakDone()
             })
             onReady()
         }
@@ -48,13 +37,8 @@ class AssistantTts(
             onSpeakDone()
             return
         }
-        val locale = if (language == AppLanguage.PERSIAN) {
-            Locale("fa", "IR")
-        } else {
-            Locale.US
-        }
+        val locale = if (language == AppLanguage.PERSIAN) Locale("fa", "IR") else Locale.US
         engine.language = locale
-        // Fallback if Persian voice is unavailable
         val available = engine.isLanguageAvailable(locale)
         if (
             available == TextToSpeech.LANG_MISSING_DATA ||
@@ -62,8 +46,7 @@ class AssistantTts(
         ) {
             engine.language = Locale.US
         }
-        val utteranceId = UUID.randomUUID().toString()
-        engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString())
     }
 
     fun stop() {
