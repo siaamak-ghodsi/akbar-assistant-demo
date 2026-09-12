@@ -23,6 +23,7 @@ object CommandParser {
         val hasPersian = persianChars.containsMatchIn(text)
         val hasLatin = latinLetters.containsMatchIn(text)
         val n = normalize(text)
+        // Strong English wake / command cues win over accidental Persian glyphs from ASR.
         if (looksEnglish(n)) return AppLanguage.ENGLISH
         if (hasPersian && !hasLatin) return AppLanguage.PERSIAN
         if (hasLatin && !hasPersian) return AppLanguage.ENGLISH
@@ -112,6 +113,7 @@ object CommandParser {
         return n.replace(Regex("\\s+"), " ").trim()
     }
 
+    /** Prefer the first alternative that maps to a known command. */
     fun parseBest(candidates: List<String>): AssistantCommand {
         if (candidates.isEmpty()) {
             return AssistantCommand.Unknown(AppLanguage.PERSIAN, "")
