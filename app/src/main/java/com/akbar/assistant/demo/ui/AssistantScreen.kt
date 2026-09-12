@@ -309,14 +309,21 @@ fun AssistantScreen(
                     onClick = { onSimulateWake(AppLanguage.PERSIAN) },
                     shape = RoundedCornerShape(10.dp),
                 ) { Text("اکبر") }
+                OutlinedButton(
+                    onClick = { onSimulateWake(AppLanguage.ENGLISH) },
+                    shape = RoundedCornerShape(10.dp),
+                ) { Text("Hey") }
                 TextButton(onClick = { onTestCommand(AssistantCommand.TellTime(AppLanguage.PERSIAN)) }) {
                     Text("ساعت")
+                }
+                TextButton(onClick = { onTestCommand(AssistantCommand.TellTime(AppLanguage.ENGLISH)) }) {
+                    Text("Time")
                 }
                 TextButton(onClick = { onTestCommand(AssistantCommand.Weather(AppLanguage.PERSIAN)) }) {
                     Text("هوا")
                 }
-                TextButton(onClick = { onTestCommand(AssistantCommand.LightOn(AppLanguage.PERSIAN)) }) {
-                    Text("چراغ")
+                TextButton(onClick = { onTestCommand(AssistantCommand.LightOn(AppLanguage.ENGLISH)) }) {
+                    Text("Light")
                 }
             }
         }
