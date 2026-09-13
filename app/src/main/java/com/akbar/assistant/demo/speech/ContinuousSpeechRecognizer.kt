@@ -11,15 +11,17 @@ import android.speech.SpeechRecognizer
 import java.util.Locale
 
 /**
- * Continuous SpeechRecognizer loop with beep silencing and calmer restart timing.
- * Pause while TTS speaks so the mic does not fight the voice reply.
+ * Continuous SpeechRecognizer loop with beep silencing and bilingual wake support.
+ * While waiting for the wake word, locales alternate fa-IR / en-US so both
+ * «هی اکبر» and "Hey Akbar" can be recognized.
  */
 class ContinuousSpeechRecognizer(
     private val context: Context,
     private val onPartialResult: (String) -> Unit,
     private val onFinalResult: (String) -> Unit,
+    private val onFinalAlternatives: (List<String>) -> Unit = {},
     private val onError: (String) -> Unit = {},
-    private val rmsCallback: (Float) -> Unit = {}
+    private val rmsCallback: (Float) -> Unit = {},
 ) {
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
@@ -27,10 +29,18 @@ class ContinuousSpeechRecognizer(
     private var paused = false
     private val handler = Handler(Looper.getMainLooper())
     private var preferredLocale: Locale = Locale("fa", "IR")
+    private var bilingualWake = false
+    private var nextWakeEnglish = false
     private val beepSilencer = RecognitionBeepSilencer(context)
 
     fun setPreferredLocale(locale: Locale) {
         preferredLocale = locale
+    }
+
+    /** Alternate fa-IR / en-US each listen cycle (for wake mode). */
+    fun setBilingualWakeMode(enabled: Boolean) {
+        bilingualWake = enabled
+        if (enabled) nextWakeEnglish = false
     }
 
     fun start() {
@@ -59,14 +69,13 @@ class ContinuousSpeechRecognizer(
             recognizer?.stopListening()
         } catch (_: Exception) {
         }
-        // Unmute so TTS can play on media / system routes cleanly.
         beepSilencer.restoreBeeps()
     }
 
     fun resume() {
         if (!shouldRun) return
         paused = false
-        scheduleRestart(350)
+        scheduleRestart(300)
     }
 
     fun stop() {
@@ -89,42 +98,69 @@ class ContinuousSpeechRecognizer(
     }
 
     private fun ensureRecognizer() {
-        if (recognizer == null) {
-            recognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-                setRecognitionListener(listener)
+        if (recognizer != null) return
+        try {
+            if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+                onError("Speech recognition is not available on this device")
+                return
             }
+            recognizer = SpeechRecognizer.createSpeechRecognizer(context)?.also {
+                it.setRecognitionListener(listener)
+            }
+            if (recognizer == null) {
+                onError("Could not create speech recognizer")
+            }
+        } catch (e: Exception) {
+            recognizer = null
+            onError(e.message ?: "Speech recognizer init failed")
         }
+    }
+
+    private fun activeLocale(): Locale {
+        if (!bilingualWake) return preferredLocale
+        nextWakeEnglish = !nextWakeEnglish
+        return if (nextWakeEnglish) Locale.US else Locale("fa", "IR")
     }
 
     private fun startInternal() {
         if (!shouldRun || paused) return
         ensureRecognizer()
-        beepSilencer.muteBeeps()
+        if (recognizer == null) {
+            scheduleRestart(1000)
+            return
+        }
+        try {
+            beepSilencer.muteBeeps()
+        } catch (_: Exception) {
+        }
+
+        val locale = activeLocale()
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 12)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, preferredLocale.toLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR,en-US")
-            // Longer silence windows = fewer restart loops = fewer beeps + better phrases.
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1400L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 800L)
-            // Reduce endpointer aggressiveness where supported.
-            putExtra("android.speech.extra.DICTATION_MODE", true)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale.toLanguageTag())
+            // Longer silence so short commands are not cut mid-phrase.
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 500L)
         }
         try {
             listening = true
             recognizer?.startListening(intent)
         } catch (e: Exception) {
             listening = false
+            try {
+                beepSilencer.restoreBeeps()
+            } catch (_: Exception) {
+            }
             onError(e.message ?: "Failed to start listening")
-            scheduleRestart(900)
+            scheduleRestart(800)
         }
     }
 
-    private fun scheduleRestart(delayMs: Long = 500) {
+    private fun scheduleRestart(delayMs: Long = 400) {
         if (!shouldRun || paused) return
         handler.removeCallbacksAndMessages(null)
         handler.postDelayed({
@@ -136,7 +172,6 @@ class ContinuousSpeechRecognizer(
         override fun onReadyForSpeech(params: Bundle?) = Unit
         override fun onBeginningOfSpeech() = Unit
         override fun onRmsChanged(rmsdB: Float) {
-            // Normalize typical SpeechRecognizer RMS (-2..10) into 0..1
             val level = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
             rmsCallback(level)
         }
@@ -149,19 +184,17 @@ class ContinuousSpeechRecognizer(
             listening = false
             when (error) {
                 SpeechRecognizer.ERROR_NO_MATCH,
-                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> scheduleRestart(450)
-                SpeechRecognizer.ERROR_CLIENT -> scheduleRestart(600)
-                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> scheduleRestart(900)
+                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> scheduleRestart(350)
+                SpeechRecognizer.ERROR_CLIENT -> scheduleRestart(500)
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> scheduleRestart(800)
                 SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
                     onError("Microphone permission required")
                 SpeechRecognizer.ERROR_NETWORK,
                 SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> {
                     onError("Speech network error — check connection / Google app")
-                    scheduleRestart(1500)
+                    scheduleRestart(1200)
                 }
-                else -> {
-                    scheduleRestart(800)
-                }
+                else -> scheduleRestart(700)
             }
         }
 
@@ -170,10 +203,12 @@ class ContinuousSpeechRecognizer(
             val matches = results
                 ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 .orEmpty()
-            val best = matches.firstOrNull().orEmpty()
-            if (best.isNotBlank()) onFinalResult(best)
-            // Give the UI/ViewModel a beat before restarting listen loop.
-            scheduleRestart(500)
+                .filter { it.isNotBlank() }
+            if (matches.isNotEmpty()) {
+                onFinalAlternatives(matches)
+                onFinalResult(matches.first())
+            }
+            scheduleRestart(400)
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
