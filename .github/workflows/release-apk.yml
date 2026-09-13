@@ -1,0 +1,53 @@
+name: Release Hey Akbar APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag name
+        required: false
+        default: v1.8.0
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 34
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          name: Hey Akbar Demo ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          body: |
+            Debug APK for the Hey Akbar employer demo.
+
+            - App name & icon: **Hey Akbar** (blue text)
+            - Bilingual wake: «هی اکبر» / Hey Akbar
+            - 120s command session after wake
+            - Persian TTS install prompt when fa voice is missing
+
+            Install: download `app-debug.apk` below, allow unknown sources, open APK.
+          files: app/build/outputs/apk/debug/app-debug.apk
+          generate_release_notes: true
