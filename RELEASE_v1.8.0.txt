@@ -1,0 +1,2 @@
+Trigger file for GitHub Actions release v1.8.0.
+This commit message includes [release] so the release workflow publishes the APK.
