@@ -231,7 +231,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         returnToWakeAfterSpeak = false
         if (!sessionActive) {
             ensureSpeech()
-            // Alternate fa-IR / en-US so both «هی اکبر» and "Hey Akbar" are heard.
+            // Prefer fa-IR for «هی اکبر»; occasional en-US for "Hey Akbar".
             speech?.setBilingualWakeMode(true)
             speech?.setPreferredLocale(Locale("fa", "IR"))
             speech?.start()
@@ -265,11 +265,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         speech = ContinuousSpeechRecognizer(
             context = getApplication(),
             onPartialResult = { text ->
-                if (awaitingCommand && activated && !speaking) {
-                    _uiState.update { it.copy(lastHeard = text) }
-                }
-                if (!activated && !speaking && CommandParser.containsWakeWord(text)) {
-                    if (CommandParser.stripWakeWord(text).isBlank()) {
+                if (speaking || text.isBlank()) return@ContinuousSpeechRecognizer
+                // Always show live transcript so the demo proves the mic is hearing.
+                _uiState.update { it.copy(lastHeard = text) }
+                if (!activated && CommandParser.containsWakeWord(text)) {
+                    val leftover = CommandParser.stripWakeWord(text)
+                    // Wake alone, or wake + short trailing noise from partial ASR.
+                    if (leftover.isBlank() || leftover.length <= 2) {
                         onWakeDetected(CommandParser.wakeLanguage(text), text)
                     }
                 }
@@ -280,6 +282,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             },
             onFinalAlternatives = { matches ->
                 if (speaking || matches.isEmpty()) return@ContinuousSpeechRecognizer
+                _uiState.update { it.copy(lastHeard = matches.first()) }
                 when {
                     !activated -> {
                         val wakeHit = matches.firstOrNull { CommandParser.containsWakeWord(it) }
@@ -288,7 +291,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         }
                     }
                     awaitingCommand -> {
-                        _uiState.update { it.copy(lastHeard = matches.first()) }
                         handleCommandAlternatives(matches)
                     }
                 }

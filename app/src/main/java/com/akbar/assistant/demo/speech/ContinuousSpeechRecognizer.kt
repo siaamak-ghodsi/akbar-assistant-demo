@@ -12,8 +12,8 @@ import java.util.Locale
 
 /**
  * Continuous SpeechRecognizer loop with beep silencing and bilingual wake support.
- * While waiting for the wake word, locales alternate fa-IR / en-US so both
- * «هی اکبر» and "Hey Akbar" can be recognized.
+ * While waiting for the wake word, locales prefer fa-IR (3 cycles) with occasional
+ * en-US so both «هی اکبر» and "Hey Akbar" can be recognized.
  */
 class ContinuousSpeechRecognizer(
     private val context: Context,
@@ -30,17 +30,18 @@ class ContinuousSpeechRecognizer(
     private val handler = Handler(Looper.getMainLooper())
     private var preferredLocale: Locale = Locale("fa", "IR")
     private var bilingualWake = false
-    private var nextWakeEnglish = false
+    /** Wake cycles: prefer fa-IR heavily so «هی اکبر» is not lost on en-US windows. */
+    private var wakeCycle = 0
     private val beepSilencer = RecognitionBeepSilencer(context)
 
     fun setPreferredLocale(locale: Locale) {
         preferredLocale = locale
     }
 
-    /** Alternate fa-IR / en-US each listen cycle (for wake mode). */
+    /** Mostly fa-IR for wake, with occasional en-US for "Hey Akbar". */
     fun setBilingualWakeMode(enabled: Boolean) {
         bilingualWake = enabled
-        if (enabled) nextWakeEnglish = false
+        if (enabled) wakeCycle = 0
     }
 
     fun start() {
@@ -120,8 +121,9 @@ class ContinuousSpeechRecognizer(
 
     private fun activeLocale(): Locale {
         if (!bilingualWake) return preferredLocale
-        nextWakeEnglish = !nextWakeEnglish
-        return if (nextWakeEnglish) Locale.US else Locale("fa", "IR")
+        wakeCycle += 1
+        // 3× Persian, then 1× English — first cycle is always fa-IR.
+        return if (wakeCycle % 4 == 0) Locale.US else Locale("fa", "IR")
     }
 
     private fun startInternal() {
@@ -143,10 +145,11 @@ class ContinuousSpeechRecognizer(
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 12)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale.toLanguageTag())
-            // Longer silence so short commands are not cut mid-phrase.
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 500L)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, locale.toLanguageTag())
+            // Longer silence so short wake phrases are not cut mid-word.
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 400L)
         }
         try {
             listening = true

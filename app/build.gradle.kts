@@ -11,8 +11,8 @@ android {
         applicationId = "com.akbar.assistant.demo"
         minSdk = 26
         targetSdk = 34
-        versionCode = 18
-        versionName = "1.9.3"
+        versionCode = 19
+        versionName = "1.9.4"
     }
 
     buildTypes {

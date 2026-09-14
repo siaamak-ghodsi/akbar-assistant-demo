@@ -147,7 +147,7 @@ fun AssistantScreen(
                 ),
                 shape = RoundedCornerShape(12.dp),
             ) {
-                Text("اجازه میکروفون")
+                Text("\u0627\u062c\u0627\u0632\u0647 \u0645\u06cc\u06a9\u0631\u0648\u0641\u0648\u0646")
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -164,10 +164,10 @@ fun AssistantScreen(
                 ),
                 shape = RoundedCornerShape(12.dp),
             ) {
-                Text("نصب صدای فارسی (Google TTS)")
+                Text("\u0646\u0635\u0628 \u0635\u062f\u0627\u06cc \u0641\u0627\u0631\u0633\u06cc (Google TTS)")
             }
             Text(
-                text = "بدون بستهٔ زبان فارسی، پاسخ‌ها شنیده نمی‌شوند",
+                text = "\u0628\u062f\u0648\u0646 \u0628\u0633\u062a\u0647\u0654 \u0632\u0628\u0627\u0646 \u0641\u0627\u0631\u0633\u06cc\u060c \u067e\u0627\u0633\u062e\u200c\u0647\u0627 \u0634\u0646\u06cc\u062f\u0647 \u0646\u0645\u06cc\u200c\u0634\u0648\u0646\u062f",
                 color = Muted,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp),
@@ -178,7 +178,7 @@ fun AssistantScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(260.dp),
+                .height(240.dp),
             contentAlignment = Alignment.Center,
         ) {
             GuardianOrb(
@@ -188,6 +188,67 @@ fun AssistantScreen(
                 rms = state.rmsLevel,
             )
         }
+
+        // Live status + what the mic just heard (wake feedback)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (state.statusText.isNotBlank()) {
+                Text(
+                    text = state.statusText,
+                    color = Ink.copy(alpha = 0.85f),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (state.lastHeard.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "\u00ab${state.lastHeard}\u00bb",
+                    color = if (listening) ListenBlue else Accent,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 26.sp,
+                )
+            } else if (listening) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = if (state.state == AssistantState.LISTENING_WAKE) {
+                        "\u062f\u0631 \u0627\u0646\u062a\u0638\u0627\u0631 \u0647\u06cc \u0627\u06a9\u0628\u0631\u2026"
+                    } else {
+                        "\u062f\u0631 \u062d\u0627\u0644 \u0634\u0646\u06cc\u062f\u0646\u2026"
+                    },
+                    color = Muted,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (state.hintText.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = state.hintText,
+                    color = Muted,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            state.errorMessage?.takeIf { it.isNotBlank() }?.let { err ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = err,
+                    color = Color(0xFFDC2626),
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Chat history (answers stay visible; orb shows voice state)
         Surface(
@@ -205,7 +266,7 @@ fun AssistantScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "بگو هی اکبر تا شروع کنیم",
+                        text = "\u0628\u06af\u0648 \u0647\u06cc \u0627\u06a9\u0628\u0631 \u062a\u0627 \u0634\u0631\u0648\u0639 \u06a9\u0646\u06cc\u0645",
                         color = Muted,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
@@ -291,7 +352,7 @@ fun AssistantScreen(
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
             ) {
                 Text(
-                    text = "ارسال",
+                    text = "\u0627\u0631\u0633\u0627\u0644",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
                 )
@@ -308,28 +369,28 @@ fun AssistantScreen(
                 OutlinedButton(
                     onClick = { onSimulateWake(AppLanguage.PERSIAN) },
                     shape = RoundedCornerShape(10.dp),
-                ) { Text("اکبر") }
+                ) { Text("\u0627\u06a9\u0628\u0631") }
                 OutlinedButton(
                     onClick = { onSimulateWake(AppLanguage.ENGLISH) },
                     shape = RoundedCornerShape(10.dp),
                 ) { Text("Hey") }
                 TextButton(onClick = { onTestCommand(AssistantCommand.TellTime(AppLanguage.PERSIAN)) }) {
-                    Text("ساعت")
+                    Text("\u0633\u0627\u0639\u062a")
                 }
                 TextButton(onClick = { onTestCommand(AssistantCommand.TellTime(AppLanguage.ENGLISH)) }) {
                     Text("Time")
                 }
                 TextButton(onClick = { onTestCommand(AssistantCommand.Weather(AppLanguage.PERSIAN)) }) {
-                    Text("هوا")
+                    Text("\u0647\u0648\u0627")
                 }
                 TextButton(onClick = { onTestCommand(AssistantCommand.LightOn(AppLanguage.ENGLISH)) }) {
                     Text("Light")
                 }
                 TextButton(onClick = { onTestCommand(AssistantCommand.CameraOn(AppLanguage.PERSIAN)) }) {
-                    Text("دوربین")
+                    Text("\u062f\u0648\u0631\u0628\u06cc\u0646")
                 }
                 TextButton(onClick = { onTestCommand(AssistantCommand.GmailOpen(AppLanguage.PERSIAN)) }) {
-                    Text("جیمیل")
+                    Text("\u062c\u06cc\u0645\u06cc\u0644")
                 }
             }
         }
