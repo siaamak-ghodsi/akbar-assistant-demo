@@ -1,4 +1,4 @@
-name: Release Hey Akbar APK
+name: Release intel tech APK
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       tag:
         description: Release tag name
         required: false
-        default: v1.8.0
+        default: v1.9.0
   push:
     tags:
       - 'v*'
@@ -44,16 +44,17 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.8.0') }}
-          name: Hey Akbar Demo v1.8.0
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.9.0') }}
+          name: intel tech Demo v1.9.0
           body: |
-            Debug APK for the Hey Akbar employer demo.
+            Debug APK for the **intel tech** smart-board demo.
 
-            - App name & icon: **Hey Akbar** (blue text)
-            - Bilingual wake: «هی اکبر» / Hey Akbar
-            - 120s command session after wake
-            - Persian TTS install prompt when fa voice is missing
+            - App name & icon: **intel tech**
+            - Wake: «هی اکبر» / Hey Akbar
+            - Commands: time, weather, flashlight, **camera on/off**, **Gmail open/close**
+            - 120s session after wake
+            - Closing camera/Gmail returns to the demo (Android cannot kill other apps)
 
-            Install: download `app-debug.apk` below, allow unknown sources, open APK.
+            Install: download `app-debug.apk`, allow unknown sources, open APK.
           files: app/build/outputs/apk/debug/app-debug.apk
           generate_release_notes: true
