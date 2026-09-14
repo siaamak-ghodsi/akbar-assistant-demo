@@ -411,3 +411,359 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 val wakeLang = CommandParser.wakeLanguage(text)
                 val prompt = ResponseBuilder.activationPrompt(wakeLang)
                 appendChat(fromUser = false, prompt)
+                _uiState.update {
+                    it.copy(
+                        language = wakeLang,
+                        lastReply = prompt,
+                        statusText = prompt,
+                    )
+                }
+                resumeCommandAfterSpeak = true
+                speakReply(prompt, wakeLang)
+            }
+            return
+        }
+
+        commandTimeoutJob?.cancel()
+        awaitingCommand = false
+        speech?.pause()
+        appendChat(fromUser = true, text)
+
+        val command = CommandParser.parseBest(matches)
+        // If ASR returned Latin but we were stuck on Persian (or vice versa),
+        // follow the language of the spoken text for the reply + next listen.
+        val language = when {
+            command !is AssistantCommand.Unknown -> languageOf(command)
+            CommandParser.detectLanguage(text) == AppLanguage.ENGLISH -> AppLanguage.ENGLISH
+            else -> languageOf(command)
+        }
+        val resolved = when {
+            command is AssistantCommand.Unknown && language == AppLanguage.ENGLISH ->
+                CommandParser.parse(text).let { parsed ->
+                    if (parsed is AssistantCommand.Unknown) {
+                        AssistantCommand.Unknown(AppLanguage.ENGLISH, text)
+                    } else {
+                        parsed
+                    }
+                }
+            else -> command
+        }
+        _uiState.update {
+            it.copy(
+                language = languageOf(resolved).let { lang ->
+                    if (resolved is AssistantCommand.Unknown) language else lang
+                },
+                lastHeard = text,
+                state = AssistantState.PROCESSING,
+                statusText = if (language == AppLanguage.PERSIAN) "یک لحظه…" else "One moment…",
+            )
+        }
+        executeCommand(
+            if (resolved is AssistantCommand.Unknown) {
+                AssistantCommand.Unknown(language, text)
+            } else {
+                resolved
+            },
+        )
+    }
+
+    private fun executeCommand(command: AssistantCommand) {
+        val language = languageOf(command)
+        var nextLight = _uiState.value.lightOn
+        var reply = ResponseBuilder.forCommand(command)
+        var error: String? = null
+
+        when (command) {
+            is AssistantCommand.LightOn -> {
+                when (flashlight.setEnabled(true)) {
+                    FlashlightController.Result.ON -> {
+                        nextLight = true
+                        reply = ResponseBuilder.forCommand(AssistantCommand.LightOn(language))
+                    }
+                    FlashlightController.Result.NO_PERMISSION -> {
+                        nextLight = false
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "اجازه دوربین را بدهید، بعد دوباره بگویید."
+                        } else {
+                            "Allow camera access, then ask again."
+                        }
+                        _uiState.update { it.copy(needsCameraPermission = true) }
+                    }
+                    FlashlightController.Result.NO_FLASH -> {
+                        nextLight = false
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "این گوشی چراغ‌قوه ندارد."
+                        } else {
+                            "This phone has no flashlight."
+                        }
+                    }
+                    else -> {
+                        nextLight = false
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "الان نتوانستم چراغ را روشن کنم."
+                        } else {
+                            "I couldn't turn the light on just now."
+                        }
+                    }
+                }
+            }
+            is AssistantCommand.LightOff -> {
+                when (flashlight.setEnabled(false)) {
+                    FlashlightController.Result.OFF -> {
+                        nextLight = false
+                        reply = ResponseBuilder.forCommand(AssistantCommand.LightOff(language))
+                    }
+                    FlashlightController.Result.NO_PERMISSION -> {
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "اجازه دوربین را بدهید، بعد دوباره بگویید."
+                        } else {
+                            "Allow camera access, then ask again."
+                        }
+                        _uiState.update { it.copy(needsCameraPermission = true) }
+                    }
+                    FlashlightController.Result.NO_FLASH -> {
+                        nextLight = false
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "این گوشی چراغ‌قوه ندارد."
+                        } else {
+                            "This phone has no flashlight."
+                        }
+                    }
+                    else -> {
+                        nextLight = flashlight.isOn
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "الان نتوانستم چراغ را خاموش کنم."
+                        } else {
+                            "I couldn't turn the light off just now."
+                        }
+                    }
+                }
+            }
+            is AssistantCommand.CameraOn -> {
+                HandoffCoordinator.startHandoff(getApplication())
+                when (apps.openCamera()) {
+                    AppLauncher.Result.OPENED -> {
+                        reply = ResponseBuilder.forCommand(AssistantCommand.CameraOn(language))
+                    }
+                    AppLauncher.Result.NOT_INSTALLED -> {
+                        HandoffCoordinator.endHandoff(getApplication())
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "اپ دوربین پیدا نشد."
+                        } else {
+                            "Camera app was not found."
+                        }
+                    }
+                    else -> {
+                        HandoffCoordinator.endHandoff(getApplication())
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "نتوانستم دوربین را باز کنم."
+                        } else {
+                            "I couldn't open the camera."
+                        }
+                    }
+                }
+            }
+            is AssistantCommand.CameraOff -> {
+                when (apps.closeCamera()) {
+                    AppLauncher.Result.CLOSED -> {
+                        // Do not endHandoff here — return notification must stay until
+                        // onAppForeground. endHandoff in the same turn cancelled return.
+                        reply = ResponseBuilder.forCommand(AssistantCommand.CameraOff(language))
+                    }
+                    else -> {
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "نتوانستم از دوربین برگردم. از نوتیفیکیشن «بازگشت» بزنید."
+                        } else {
+                            "I couldn't close the camera. Tap Return in the notification."
+                        }
+                    }
+                }
+            }
+            is AssistantCommand.GmailOpen -> {
+                HandoffCoordinator.startHandoff(getApplication())
+                when (apps.openGmail()) {
+                    AppLauncher.Result.OPENED -> {
+                        reply = ResponseBuilder.forCommand(AssistantCommand.GmailOpen(language))
+                    }
+                    AppLauncher.Result.NOT_INSTALLED -> {
+                        HandoffCoordinator.endHandoff(getApplication())
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "جیمیل روی این دستگاه نصب نیست."
+                        } else {
+                            "Gmail is not installed on this device."
+                        }
+                    }
+                    else -> {
+                        HandoffCoordinator.endHandoff(getApplication())
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "نتوانستم جیمیل را باز کنم."
+                        } else {
+                            "I couldn't open Gmail."
+                        }
+                    }
+                }
+            }
+            is AssistantCommand.GmailClose -> {
+                when (apps.closeGmail()) {
+                    AppLauncher.Result.CLOSED -> {
+                        // Keep handoff/return alive until Activity is actually front.
+                        reply = ResponseBuilder.forCommand(AssistantCommand.GmailClose(language))
+                    }
+                    else -> {
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "نتوانستم جیمیل را ببندم. از نوتیفیکیشن «بازگشت» بزنید."
+                        } else {
+                            "I couldn't close Gmail. Tap Return in the notification."
+                        }
+                    }
+                }
+            }
+            else -> Unit
+        }
+
+        awaitingCommand = false
+        resumeCommandAfterSpeak = true
+        returnToWakeAfterSpeak = false
+        sessionActive = true
+
+        appendChat(fromUser = false, reply)
+        _uiState.update {
+            it.copy(
+                lightOn = nextLight,
+                lastReply = reply,
+                language = language,
+                statusText = reply,
+                hintText = if (language == AppLanguage.PERSIAN) {
+                    "می‌توانید دستور بعدی را بگویید"
+                } else {
+                    "You can give another command"
+                },
+                errorMessage = error,
+                state = AssistantState.SPEAKING,
+                sessionActive = true,
+                lastHeard = ""
+            )
+        }
+        speakReply(reply, language)
+        armSessionTimeout(language)
+    }
+
+    private fun armSessionTimeout(language: AppLanguage) {
+        commandTimeoutJob?.cancel()
+        commandTimeoutJob = viewModelScope.launch {
+            delay(120_000)
+            if (sessionActive && !speaking) {
+                sessionActive = false
+                activated = false
+                awaitingCommand = false
+                _uiState.update {
+                    it.copy(
+                        sessionActive = false,
+                        statusText = if (language == AppLanguage.PERSIAN) {
+                            "جلسه تمام شد — دوباره هی اکبر بگویید"
+                        } else {
+                            "Session ended — say Hey Akbar again"
+                        }
+                    )
+                }
+                enterWakeMode(language)
+            }
+        }
+    }
+
+    private fun speakReply(text: String, language: AppLanguage) {
+        if (text.isBlank()) {
+            if (resumeCommandAfterSpeak || sessionActive) {
+                resumeCommandAfterSpeak = false
+                startCommandListening()
+            }
+            return
+        }
+        try {
+            speaking = true
+            // Stop mic + restore any muted streams before TTS so the reply is audible.
+            speech?.pause()
+            _uiState.update { it.copy(state = AssistantState.SPEAKING) }
+            // Tiny delay lets the recognizer fully release the audio path.
+            viewModelScope.launch {
+                delay(180)
+                if (!speaking) {
+                    // Lifecycle aborted TTS mid-flight — still resume command loop.
+                    if (resumeCommandAfterSpeak || sessionActive) {
+                        resumeCommandAfterSpeak = false
+                        startCommandListening()
+                    }
+                    return@launch
+                }
+                try {
+                    tts?.speak(text, language)
+                } catch (e: Exception) {
+                    speaking = false
+                    _uiState.update { it.copy(errorMessage = e.message) }
+                    if (resumeCommandAfterSpeak || sessionActive) {
+                        resumeCommandAfterSpeak = false
+                        startCommandListening()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            speaking = false
+            _uiState.update { it.copy(errorMessage = e.message) }
+            if (resumeCommandAfterSpeak || sessionActive) {
+                resumeCommandAfterSpeak = false
+                startCommandListening()
+            }
+        }
+    }
+
+    private fun appendChat(fromUser: Boolean, text: String) {
+        if (text.isBlank()) return
+        val msg = ChatMessage(
+            id = messageIds.getAndIncrement(),
+            fromUser = fromUser,
+            text = text
+        )
+        _uiState.update { it.copy(chatMessages = it.chatMessages + msg) }
+    }
+
+    private fun languageOf(command: AssistantCommand): AppLanguage = when (command) {
+        is AssistantCommand.TellTime -> command.language
+        is AssistantCommand.Weather -> command.language
+        is AssistantCommand.LightOn -> command.language
+        is AssistantCommand.LightOff -> command.language
+        is AssistantCommand.CameraOn -> command.language
+        is AssistantCommand.CameraOff -> command.language
+        is AssistantCommand.GmailOpen -> command.language
+        is AssistantCommand.GmailClose -> command.language
+        is AssistantCommand.Unknown -> command.language
+    }
+
+    private fun samplePhrase(command: AssistantCommand): String = when (command) {
+        is AssistantCommand.TellTime ->
+            if (command.language == AppLanguage.PERSIAN) "ساعت چنده؟" else "What time is it?"
+        is AssistantCommand.Weather ->
+            if (command.language == AppLanguage.PERSIAN) "هوا چطوره؟" else "What's the weather?"
+        is AssistantCommand.LightOn ->
+            if (command.language == AppLanguage.PERSIAN) "چراغ رو روشن کن" else "Turn on the light"
+        is AssistantCommand.LightOff ->
+            if (command.language == AppLanguage.PERSIAN) "چراغ رو خاموش کن" else "Turn off the light"
+        is AssistantCommand.CameraOn ->
+            if (command.language == AppLanguage.PERSIAN) "دوربین رو روشن کن" else "Turn on the camera"
+        is AssistantCommand.CameraOff ->
+            if (command.language == AppLanguage.PERSIAN) "دوربین رو خاموش کن" else "Turn off the camera"
+        is AssistantCommand.GmailOpen ->
+            if (command.language == AppLanguage.PERSIAN) "جیمیل رو باز کن" else "Open Gmail"
+        is AssistantCommand.GmailClose ->
+            if (command.language == AppLanguage.PERSIAN) "جیمیل رو ببند" else "Close Gmail"
+        is AssistantCommand.Unknown -> command.raw
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        commandTimeoutJob?.cancel()
+        flashlight.turnOffQuietly()
+        HandoffCoordinator.endHandoff(getApplication())
+        speech?.destroy()
+        tts?.shutdown()
+    }
+}
