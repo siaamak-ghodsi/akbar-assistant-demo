@@ -1,1 +1,5 @@
-@file:///workspace/.tmp_push/_content_only.kt
+package test
+
+fun foo(x: List<String>): Map<String, Int> {
+    return mapOf("a" to 1)
+}
