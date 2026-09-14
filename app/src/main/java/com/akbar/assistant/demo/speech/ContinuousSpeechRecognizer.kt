@@ -50,13 +50,15 @@ class ContinuousSpeechRecognizer(
             onError("Speech recognition is not available on this device")
             return
         }
+        // Recreate after cancel/busy/handoff — reuse often leaves ERROR_CLIENT forever.
+        try {
+            recognizer?.destroy()
+        } catch (_: Exception) {
+        }
+        recognizer = null
         ensureRecognizer()
         listening = false
         handler.removeCallbacksAndMessages(null)
-        try {
-            recognizer?.cancel()
-        } catch (_: Exception) {
-        }
         startInternal()
     }
 
@@ -185,7 +187,15 @@ class ContinuousSpeechRecognizer(
             when (error) {
                 SpeechRecognizer.ERROR_NO_MATCH,
                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> scheduleRestart(350)
-                SpeechRecognizer.ERROR_CLIENT -> scheduleRestart(500)
+                SpeechRecognizer.ERROR_CLIENT -> {
+                    // Dead recognizer instance — recreate then retry.
+                    try {
+                        recognizer?.destroy()
+                    } catch (_: Exception) {
+                    }
+                    recognizer = null
+                    scheduleRestart(500)
+                }
                 SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> scheduleRestart(800)
                 SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
                     onError("Microphone permission required")
