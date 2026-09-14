@@ -1,0 +1,212 @@
+package com.akbar.assistant.demo
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.akbar.assistant.demo.commands.AssistantCommand
+import com.akbar.assistant.demo.commands.CommandParser
+import com.akbar.assistant.demo.commands.ResponseBuilder
+import com.akbar.assistant.demo.device.AppLauncher
+import com.akbar.assistant.demo.device.FlashlightController
+import com.akbar.assistant.demo.handoff.HandoffCoordinator
+import com.akbar.assistant.demo.handoff.HandoffListenService
+import com.akbar.assistant.demo.speech.AssistantTts
+import com.akbar.assistant.demo.speech.ContinuousSpeechRecognizer
+import java.util.Locale
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+class AssistantViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val _uiState = MutableStateFlow(AssistantUiState())
+    val uiState: StateFlow<AssistantUiState> = _uiState.asStateFlow()
+
+    private val flashlight = FlashlightController(application)
+    private val apps = AppLauncher(application)
+    private var speech: ContinuousSpeechRecognizer? = null
+    private var tts: AssistantTts? = null
+
+    private var commandTimeoutJob: Job? = null
+    private var activated = false
+    private var awaitingCommand = false
+    private var speaking = false
+    private var resumeCommandAfterSpeak = false
+    private var returnToWakeAfterSpeak = false
+    private var sessionActive = false
+    private val messageIds = AtomicLong(1L)
+
+    init {
+        tts = AssistantTts(
+            context = application,
+            onSpeakStart = {
+                speaking = true
+                speech?.pause()
+                _uiState.update { it.copy(state = AssistantState.SPEAKING) }
+            },
+            onSpeakDone = {
+                speaking = false
+                when {
+                    resumeCommandAfterSpeak -> {
+                        resumeCommandAfterSpeak = false
+                        startCommandListening()
+                    }
+                    returnToWakeAfterSpeak -> {
+                        returnToWakeAfterSpeak = false
+                        if (!sessionActive) {
+                            activated = false
+                            awaitingCommand = false
+                            enterWakeMode(_uiState.value.language)
+                        } else {
+                            startCommandListening()
+                        }
+                    }
+                    else -> {
+                        if (sessionActive) {
+                            startCommandListening()
+                        } else if (!activated) {
+                            enterWakeMode(_uiState.value.language)
+                        }
+                    }
+                }
+            },
+            onPersianVoiceMissing = {
+                _uiState.update {
+                    it.copy(
+                        needsPersianTtsInstall = true,
+                        hintText = "برای صدای فارسی، بستهٔ زبان TTS را نصب کنید",
+                    )
+                }
+            },
+        )
+    }
+
+    fun clearPersianTtsInstallPrompt() {
+        _uiState.update { it.copy(needsPersianTtsInstall = false) }
+    }
+
+    fun onPermissionsResult(micGranted: Boolean, cameraGranted: Boolean) {
+        _uiState.update {
+            it.copy(
+                permissionGranted = micGranted,
+                cameraPermissionGranted = cameraGranted,
+                needsCameraPermission = false,
+                errorMessage = null
+            )
+        }
+        if (micGranted) {
+            if (sessionActive) startCommandListening() else enterWakeMode(_uiState.value.language)
+        } else {
+            speech?.stop()
+            _uiState.update {
+                it.copy(
+                    state = AssistantState.IDLE,
+                    statusText = "برای شنیدن شما آماده‌ام",
+                    hintText = "Microphone access is needed",
+                    errorMessage = null
+                )
+            }
+        }
+    }
+
+    fun toggleTestMode() {
+        _uiState.update { it.copy(testModeVisible = !it.testModeVisible) }
+    }
+
+    fun simulateWake(language: AppLanguage) {
+        onWakeDetected(
+            language,
+            if (language == AppLanguage.PERSIAN) "هی اکبر" else "Hey Akbar"
+        )
+    }
+
+    fun runTestCommand(command: AssistantCommand) {
+        viewModelScope.launch {
+            openSession(languageOf(command))
+            val phrase = samplePhrase(command)
+            appendChat(fromUser = true, phrase)
+            _uiState.update {
+                it.copy(
+                    language = languageOf(command),
+                    lastHeard = phrase,
+                    state = AssistantState.PROCESSING,
+                    statusText = if (languageOf(command) == AppLanguage.PERSIAN) {
+                        "یک لحظه…"
+                    } else {
+                        "One moment…"
+                    }
+                )
+            }
+            delay(120)
+            executeCommand(command)
+        }
+    }
+
+    fun onDraftChanged(text: String) {
+        _uiState.update { it.copy(draftText = text) }
+    }
+
+    fun sendTextCommand() {
+        val text = _uiState.value.draftText.trim()
+        if (text.isBlank()) return
+        _uiState.update { it.copy(draftText = "") }
+
+        if (!sessionActive) {
+            openSession(CommandParser.detectLanguage(text))
+        }
+
+        if (CommandParser.containsWakeWord(text) && CommandParser.stripWakeWord(text).isBlank()) {
+            onWakeDetected(CommandParser.wakeLanguage(text), text)
+            return
+        }
+
+        activated = true
+        awaitingCommand = true
+        handleCommandAlternatives(listOf(text))
+    }
+
+    fun onAppForeground() {
+        // Always clear leftover handoff FGS / call-style notifications so the
+        // wake-word mic can start cleanly.
+        HandoffCoordinator.endHandoff(getApplication())
+        HandoffListenService.cancelNotifications(getApplication())
+
+        if (!_uiState.value.permissionGranted) return
+        try {
+            speaking = false
+            // Recreate the recognizer — after handoff/FGS it can be stuck busy.
+            speech?.destroy()
+            speech = null
+            if (sessionActive) startCommandListening() else enterWakeMode(_uiState.value.language)
+        } catch (e: Exception) {
+            _uiState.update { it.copy(errorMessage = e.message) }
+        }
+    }
+
+    fun onAppBackground() {
+        // While Camera/Gmail is open we keep listening via the handoff FGS.
+        if (HandoffCoordinator.active) return
+        try {
+            speech?.pause()
+        } catch (_: Exception) {
+        }
+    }
+
+    fun releaseHardware() {
+        flashlight.turnOffQuietly()
+        _uiState.update { it.copy(lightOn = false) }
+    }
+
+    private fun openSession(language: AppLanguage) {
+        sessionActive = true
+        activated = true
+        awaitingCommand = true
+        _uiState.update {
+            it.copy(
+                sessionActive = true,
+                langua
