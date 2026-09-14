@@ -1,0 +1,39 @@
+name: Restore AssistantViewModel
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".restore/**"
+      - ".github/workflows/restore-viewmodel.yml"
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble ViewModel from parts
+        run: |
+          set -euo pipefail
+          dest="app/src/main/java/com/akbar/assistant/demo/AssistantViewModel.kt"
+          cat .restore/AssistantViewModel.part0 \
+              .restore/AssistantViewModel.part1 \
+              .restore/AssistantViewModel.part2 \
+              .restore/AssistantViewModel.part3 > "$dest"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          p = Path("app/src/main/java/com/akbar/assistant/demo/AssistantViewModel.kt")
+          t = p.read_text()
+          assert "Always show live transcript" in t
+          assert hashlib.sha256(t.encode()).hexdigest() == "2bef6e3837396fbeb261b829c29c34e8a7a78ce3f1218ae67652cad3d011e3bf"
+          assert len(t) == 29393
+          print("ViewModel OK", len(t))
+          PY
+          rm -rf .restore .cursor-canary-v194.txt || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git status
+          git commit -m "[release] Show live wake transcript + Persian-first ASR (v1.9.4)"
+          git push
