@@ -51,16 +51,19 @@ class ContinuousSpeechRecognizer(
             onError("Speech recognition is not available on this device")
             return
         }
-        // Recreate after cancel/busy/handoff — reuse often leaves ERROR_CLIENT forever.
-        try {
-            recognizer?.destroy()
-        } catch (_: Exception) {
-        }
-        recognizer = null
+        // Reuse the recognizer across commands (v1.9.2 behavior). Destroying on every
+        // start() caused ERROR_CLIENT / permanent silence after the first command.
         ensureRecognizer()
         listening = false
         handler.removeCallbacksAndMessages(null)
-        startInternal()
+        try {
+            recognizer?.cancel()
+        } catch (_: Exception) {
+        }
+        // Brief gap so cancel settles before startListening.
+        handler.postDelayed({
+            if (shouldRun && !paused && !listening) startInternal()
+        }, 180)
     }
 
     fun pause() {
@@ -191,13 +194,13 @@ class ContinuousSpeechRecognizer(
                 SpeechRecognizer.ERROR_NO_MATCH,
                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> scheduleRestart(350)
                 SpeechRecognizer.ERROR_CLIENT -> {
-                    // Dead recognizer instance — recreate then retry.
+                    // Only recreate on hard client errors — not on every command cycle.
                     try {
                         recognizer?.destroy()
                     } catch (_: Exception) {
                     }
                     recognizer = null
-                    scheduleRestart(500)
+                    scheduleRestart(700)
                 }
                 SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> scheduleRestart(800)
                 SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->

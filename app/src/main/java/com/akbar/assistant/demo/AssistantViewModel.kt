@@ -171,17 +171,25 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun onAppForeground() {
-        // Always clear leftover handoff FGS / call-style notifications so the
-        // wake-word mic can start cleanly.
+        val wasHandoff = HandoffCoordinator.active
+        // End handoff FGS first, then clear return/CALL notifications *before* mic restart
+        // so CATEGORY_CALL leftovers cannot poison SpeechRecognizer.
         HandoffCoordinator.endHandoff(getApplication())
+        HandoffCoordinator.clearReturnNotifications(getApplication())
         HandoffListenService.cancelNotifications(getApplication())
 
         if (!_uiState.value.permissionGranted) return
         try {
-            speaking = false
-            // Recreate the recognizer — after handoff/FGS it can be stuck busy.
-            speech?.destroy()
-            speech = null
+            if (speaking) {
+                // Let TTS finish; onSpeakDone will resume listening.
+                return
+            }
+            // Only recreate recognizer when returning from Camera/Gmail. Destroying on
+            // every onStart broke the multi-command loop (one command then silence).
+            if (wasHandoff) {
+                speech?.destroy()
+                speech = null
+            }
             if (sessionActive) startCommandListening() else enterWakeMode(_uiState.value.language)
         } catch (e: Exception) {
             _uiState.update { it.copy(errorMessage = e.message) }
@@ -558,7 +566,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             is AssistantCommand.CameraOff -> {
                 when (apps.closeCamera()) {
                     AppLauncher.Result.CLOSED -> {
-                        HandoffCoordinator.endHandoff(getApplication())
+                        // Do not endHandoff here — return notification must stay until
+                        // onAppForeground. endHandoff in the same turn cancelled return.
                         reply = ResponseBuilder.forCommand(AssistantCommand.CameraOff(language))
                     }
                     else -> {
@@ -597,7 +606,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             is AssistantCommand.GmailClose -> {
                 when (apps.closeGmail()) {
                     AppLauncher.Result.CLOSED -> {
-                        HandoffCoordinator.endHandoff(getApplication())
+                        // Keep handoff/return alive until Activity is actually front.
                         reply = ResponseBuilder.forCommand(AssistantCommand.GmailClose(language))
                     }
                     else -> {
@@ -678,7 +687,14 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             // Tiny delay lets the recognizer fully release the audio path.
             viewModelScope.launch {
                 delay(180)
-                if (!speaking) return@launch
+                if (!speaking) {
+                    // Lifecycle aborted TTS mid-flight — still resume command loop.
+                    if (resumeCommandAfterSpeak || sessionActive) {
+                        resumeCommandAfterSpeak = false
+                        startCommandListening()
+                    }
+                    return@launch
+                }
                 try {
                     tts?.speak(text, language)
                 } catch (e: Exception) {
