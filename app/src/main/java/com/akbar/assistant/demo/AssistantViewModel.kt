@@ -8,6 +8,7 @@ import com.akbar.assistant.demo.commands.CommandParser
 import com.akbar.assistant.demo.commands.ResponseBuilder
 import com.akbar.assistant.demo.device.AppLauncher
 import com.akbar.assistant.demo.device.FlashlightController
+import com.akbar.assistant.demo.handoff.HandoffCoordinator
 import com.akbar.assistant.demo.speech.AssistantTts
 import com.akbar.assistant.demo.speech.ContinuousSpeechRecognizer
 import java.util.Locale
@@ -169,6 +170,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun onAppForeground() {
+        if (HandoffCoordinator.active) {
+            HandoffCoordinator.endHandoff(getApplication())
+        }
         if (!_uiState.value.permissionGranted) return
         try {
             if (sessionActive) startCommandListening() else enterWakeMode(_uiState.value.language)
@@ -178,6 +182,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun onAppBackground() {
+        // While Camera/Gmail is open we keep listening via the handoff FGS.
+        if (HandoffCoordinator.active) return
         try {
             speech?.pause()
         } catch (_: Exception) {
@@ -517,11 +523,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
             is AssistantCommand.CameraOn -> {
+                HandoffCoordinator.startHandoff(getApplication())
                 when (apps.openCamera()) {
                     AppLauncher.Result.OPENED -> {
                         reply = ResponseBuilder.forCommand(AssistantCommand.CameraOn(language))
                     }
                     AppLauncher.Result.NOT_INSTALLED -> {
+                        HandoffCoordinator.endHandoff(getApplication())
                         reply = if (language == AppLanguage.PERSIAN) {
                             "اپ دوربین پیدا نشد."
                         } else {
@@ -529,6 +537,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         }
                     }
                     else -> {
+                        HandoffCoordinator.endHandoff(getApplication())
                         reply = if (language == AppLanguage.PERSIAN) {
                             "نتوانستم دوربین را باز کنم."
                         } else {
@@ -540,23 +549,26 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             is AssistantCommand.CameraOff -> {
                 when (apps.closeCamera()) {
                     AppLauncher.Result.CLOSED -> {
+                        HandoffCoordinator.endHandoff(getApplication())
                         reply = ResponseBuilder.forCommand(AssistantCommand.CameraOff(language))
                     }
                     else -> {
                         reply = if (language == AppLanguage.PERSIAN) {
-                            "نتوانستم از دوربین برگردم."
+                            "نتوانستم از دوربین برگردم. از نوتیفیکیشن «بازگشت» بزنید."
                         } else {
-                            "I couldn't close the camera."
+                            "I couldn't close the camera. Tap Return in the notification."
                         }
                     }
                 }
             }
             is AssistantCommand.GmailOpen -> {
+                HandoffCoordinator.startHandoff(getApplication())
                 when (apps.openGmail()) {
                     AppLauncher.Result.OPENED -> {
                         reply = ResponseBuilder.forCommand(AssistantCommand.GmailOpen(language))
                     }
                     AppLauncher.Result.NOT_INSTALLED -> {
+                        HandoffCoordinator.endHandoff(getApplication())
                         reply = if (language == AppLanguage.PERSIAN) {
                             "جیمیل روی این دستگاه نصب نیست."
                         } else {
@@ -564,6 +576,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         }
                     }
                     else -> {
+                        HandoffCoordinator.endHandoff(getApplication())
                         reply = if (language == AppLanguage.PERSIAN) {
                             "نتوانستم جیمیل را باز کنم."
                         } else {
@@ -575,13 +588,14 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             is AssistantCommand.GmailClose -> {
                 when (apps.closeGmail()) {
                     AppLauncher.Result.CLOSED -> {
+                        HandoffCoordinator.endHandoff(getApplication())
                         reply = ResponseBuilder.forCommand(AssistantCommand.GmailClose(language))
                     }
                     else -> {
                         reply = if (language == AppLanguage.PERSIAN) {
-                            "نتوانستم جیمیل را ببندم."
+                            "نتوانستم جیمیل را ببندم. از نوتیفیکیشن «بازگشت» بزنید."
                         } else {
-                            "I couldn't close Gmail."
+                            "I couldn't close Gmail. Tap Return in the notification."
                         }
                     }
                 }
@@ -723,6 +737,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         super.onCleared()
         commandTimeoutJob?.cancel()
         flashlight.turnOffQuietly()
+        HandoffCoordinator.endHandoff(getApplication())
         speech?.destroy()
         tts?.shutdown()
     }

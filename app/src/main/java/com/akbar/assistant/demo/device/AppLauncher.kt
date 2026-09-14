@@ -5,12 +5,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
+import com.akbar.assistant.demo.handoff.HandoffCoordinator
 
 /**
  * Opens/closes external apps for the smart-board demo.
  *
  * Android does not allow killing other apps. "Close" brings our demo
- * (or the home screen) back to the foreground — good enough for a live demo.
+ * back to the foreground via a PendingIntent created while we were visible.
  */
 class AppLauncher(private val context: Context) {
 
@@ -60,11 +61,16 @@ class AppLauncher(private val context: Context) {
     fun closeGmail(): Result = bringDemoToFront()
 
     private fun bringDemoToFront(): Result {
+        // Prefer the Activity-created PendingIntent (works from background on Android 10+).
+        if (HandoffCoordinator.returnToDemo()) {
+            return Result.CLOSED
+        }
         return try {
             val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
             if (launch != null) {
                 launch.addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP,
                 )
