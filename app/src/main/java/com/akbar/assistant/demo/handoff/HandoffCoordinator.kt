@@ -49,6 +49,7 @@ object HandoffCoordinator {
     fun endHandoff(context: Context) {
         active = false
         HandoffListenService.stop(context)
+        HandoffListenService.cancelNotifications(context)
     }
 
     /**
