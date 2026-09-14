@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.akbar.assistant.demo.commands.AssistantCommand
 import com.akbar.assistant.demo.commands.CommandParser
 import com.akbar.assistant.demo.commands.ResponseBuilder
+import com.akbar.assistant.demo.device.AppLauncher
 import com.akbar.assistant.demo.device.FlashlightController
 import com.akbar.assistant.demo.speech.AssistantTts
 import com.akbar.assistant.demo.speech.ContinuousSpeechRecognizer
@@ -25,6 +26,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     val uiState: StateFlow<AssistantUiState> = _uiState.asStateFlow()
 
     private val flashlight = FlashlightController(application)
+    private val apps = AppLauncher(application)
     private var speech: ContinuousSpeechRecognizer? = null
     private var tts: AssistantTts? = null
 
@@ -514,6 +516,76 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
             }
+            is AssistantCommand.CameraOn -> {
+                when (apps.openCamera()) {
+                    AppLauncher.Result.OPENED -> {
+                        reply = ResponseBuilder.forCommand(AssistantCommand.CameraOn(language))
+                    }
+                    AppLauncher.Result.NOT_INSTALLED -> {
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "اپ دوربین پیدا نشد."
+                        } else {
+                            "Camera app was not found."
+                        }
+                    }
+                    else -> {
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "نتوانستم دوربین را باز کنم."
+                        } else {
+                            "I couldn't open the camera."
+                        }
+                    }
+                }
+            }
+            is AssistantCommand.CameraOff -> {
+                when (apps.closeCamera()) {
+                    AppLauncher.Result.CLOSED -> {
+                        reply = ResponseBuilder.forCommand(AssistantCommand.CameraOff(language))
+                    }
+                    else -> {
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "نتوانستم از دوربین برگردم."
+                        } else {
+                            "I couldn't close the camera."
+                        }
+                    }
+                }
+            }
+            is AssistantCommand.GmailOpen -> {
+                when (apps.openGmail()) {
+                    AppLauncher.Result.OPENED -> {
+                        reply = ResponseBuilder.forCommand(AssistantCommand.GmailOpen(language))
+                    }
+                    AppLauncher.Result.NOT_INSTALLED -> {
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "جیمیل روی این دستگاه نصب نیست."
+                        } else {
+                            "Gmail is not installed on this device."
+                        }
+                    }
+                    else -> {
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "نتوانستم جیمیل را باز کنم."
+                        } else {
+                            "I couldn't open Gmail."
+                        }
+                    }
+                }
+            }
+            is AssistantCommand.GmailClose -> {
+                when (apps.closeGmail()) {
+                    AppLauncher.Result.CLOSED -> {
+                        reply = ResponseBuilder.forCommand(AssistantCommand.GmailClose(language))
+                    }
+                    else -> {
+                        reply = if (language == AppLanguage.PERSIAN) {
+                            "نتوانستم جیمیل را ببندم."
+                        } else {
+                            "I couldn't close Gmail."
+                        }
+                    }
+                }
+            }
             else -> Unit
         }
 
@@ -620,6 +692,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         is AssistantCommand.Weather -> command.language
         is AssistantCommand.LightOn -> command.language
         is AssistantCommand.LightOff -> command.language
+        is AssistantCommand.CameraOn -> command.language
+        is AssistantCommand.CameraOff -> command.language
+        is AssistantCommand.GmailOpen -> command.language
+        is AssistantCommand.GmailClose -> command.language
         is AssistantCommand.Unknown -> command.language
     }
 
@@ -632,6 +708,14 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             if (command.language == AppLanguage.PERSIAN) "چراغ رو روشن کن" else "Turn on the light"
         is AssistantCommand.LightOff ->
             if (command.language == AppLanguage.PERSIAN) "چراغ رو خاموش کن" else "Turn off the light"
+        is AssistantCommand.CameraOn ->
+            if (command.language == AppLanguage.PERSIAN) "دوربین رو روشن کن" else "Turn on the camera"
+        is AssistantCommand.CameraOff ->
+            if (command.language == AppLanguage.PERSIAN) "دوربین رو خاموش کن" else "Turn off the camera"
+        is AssistantCommand.GmailOpen ->
+            if (command.language == AppLanguage.PERSIAN) "جیمیل رو باز کن" else "Open Gmail"
+        is AssistantCommand.GmailClose ->
+            if (command.language == AppLanguage.PERSIAN) "جیمیل رو ببند" else "Close Gmail"
         is AssistantCommand.Unknown -> command.raw
     }
 
