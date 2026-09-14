@@ -11,6 +11,10 @@ sealed class AssistantCommand {
     data class Weather(val language: AppLanguage) : AssistantCommand()
     data class LightOn(val language: AppLanguage) : AssistantCommand()
     data class LightOff(val language: AppLanguage) : AssistantCommand()
+    data class CameraOn(val language: AppLanguage) : AssistantCommand()
+    data class CameraOff(val language: AppLanguage) : AssistantCommand()
+    data class GmailOpen(val language: AppLanguage) : AssistantCommand()
+    data class GmailClose(val language: AppLanguage) : AssistantCommand()
     data class Unknown(val language: AppLanguage, val raw: String) : AssistantCommand()
 }
 
@@ -35,6 +39,7 @@ object CommandParser {
             "hey akbar", "hi akbar", "hay akbar", "ok akbar", "okay akbar", "yo akbar",
             "what time", "weather", "temperature", "forecast", "flashlight",
             "turn on", "turn off", "switch on", "switch off", "lights",
+            "camera", "gmail", "mail", "email",
         )
         if (englishCues.any { n.contains(it) }) return true
         val words = n.split(" ")
@@ -148,6 +153,10 @@ object CommandParser {
         return when {
             isTime(n, compact, language) -> AssistantCommand.TellTime(language)
             isWeather(n, compact, language) -> AssistantCommand.Weather(language)
+            isCameraOn(n, language) -> AssistantCommand.CameraOn(language)
+            isCameraOff(n, language) -> AssistantCommand.CameraOff(language)
+            isGmailOpen(n, language) -> AssistantCommand.GmailOpen(language)
+            isGmailClose(n, language) -> AssistantCommand.GmailClose(language)
             isLightOn(n, language) -> AssistantCommand.LightOn(language)
             isLightOff(n, language) -> AssistantCommand.LightOff(language)
             else -> null
@@ -238,6 +247,62 @@ object CommandParser {
             n.contains("light off") || n.contains("lights off") ||
             n.contains("flashlight off") || Regex("\\boff\\b").containsMatchIn(n)
     }
+    private fun mentionsCamera(n: String): Boolean {
+        return n.contains("دوربین") || n.contains("دوربين") || n.contains("camera") ||
+            n.contains("webcam") || n.contains("cam")
+    }
+
+    private fun isCameraOn(n: String, language: AppLanguage): Boolean {
+        if (!mentionsCamera(n)) return false
+        if (language == AppLanguage.PERSIAN) {
+            return n.contains("روشن") || n.contains("باز") || n.contains("فعال") ||
+                n.contains("شروع") || n.contains("بزن")
+        }
+        return n.contains("turn on") || n.contains("switch on") || n.contains("open") ||
+            n.contains("start") || n.contains("enable") ||
+            (Regex("\\bon\\b").containsMatchIn(n) && !n.contains("off"))
+    }
+
+    private fun isCameraOff(n: String, language: AppLanguage): Boolean {
+        if (!mentionsCamera(n)) return false
+        if (language == AppLanguage.PERSIAN) {
+            return n.contains("خاموش") || n.contains("ببند") || n.contains("قطع") ||
+                n.contains("متوقف") || n.contains("بسته")
+        }
+        return n.contains("turn off") || n.contains("switch off") || n.contains("close") ||
+            n.contains("stop") || n.contains("disable") || Regex("\\boff\\b").containsMatchIn(n)
+    }
+
+    private fun mentionsGmail(n: String): Boolean {
+        return n.contains("جیمیل") || n.contains("جیميل") || n.contains("جی میل") ||
+            n.contains("ایمیل") || n.contains("ای ميل") ||
+            n.contains("gmail") || n.contains("g mail") || n.contains("email") ||
+            n.contains("inbox") || (n.contains("mail") && !n.contains("male"))
+    }
+
+    private fun isGmailOpen(n: String, language: AppLanguage): Boolean {
+        if (!mentionsGmail(n)) return false
+        // Avoid matching plain "mail" weather? no.
+        if (language == AppLanguage.PERSIAN) {
+            return n.contains("باز") || n.contains("روشن") || n.contains("باز کن") ||
+                n.contains("بازکن") || n.contains("بیار") || n.contains("نشان") ||
+                n.contains("اجرا") || n == "جیمیل" || n == "ایمیل" || n.contains("جیمیل رو")
+        }
+        return n.contains("open") || n.contains("launch") || n.contains("start") ||
+            n.contains("show") || n.contains("turn on") ||
+            n == "gmail" || n == "email" || n == "mail" || n.contains("open gmail")
+    }
+
+    private fun isGmailClose(n: String, language: AppLanguage): Boolean {
+        if (!mentionsGmail(n)) return false
+        if (language == AppLanguage.PERSIAN) {
+            return n.contains("ببند") || n.contains("خاموش") || n.contains("بسته") ||
+                n.contains("قطع") || n.contains("ببندش")
+        }
+        return n.contains("close") || n.contains("quit") || n.contains("exit") ||
+            n.contains("turn off") || n.contains("stop")
+    }
+
 }
 
 object ResponseBuilder {
@@ -246,9 +311,9 @@ object ResponseBuilder {
 
     fun activationPrompt(language: AppLanguage): String {
         return if (language == AppLanguage.PERSIAN) {
-            "بله، بفرمایید. می‌توانید بگویید ساعت، هوا، یا چراغ‌قوه را روشن و خاموش کنید."
+            "بله، بفرمایید. می‌توانید بگویید ساعت، هوا، چراغ‌قوه، دوربین یا جیمیل."
         } else {
-            "Yes? You can ask about time, weather, or the flashlight."
+            "Yes? You can ask about time, weather, flashlight, camera, or Gmail."
         }
     }
 
@@ -268,11 +333,35 @@ object ResponseBuilder {
                 } else {
                     "Okay. The flashlight is off."
                 }
+            is AssistantCommand.CameraOn ->
+                if (command.language == AppLanguage.PERSIAN) {
+                    "باشه. دوربین را باز کردم."
+                } else {
+                    "Okay. I opened the camera."
+                }
+            is AssistantCommand.CameraOff ->
+                if (command.language == AppLanguage.PERSIAN) {
+                    "باشه. از دوربین برگشتم."
+                } else {
+                    "Okay. I closed the camera and came back."
+                }
+            is AssistantCommand.GmailOpen ->
+                if (command.language == AppLanguage.PERSIAN) {
+                    "باشه. جیمیل را باز کردم."
+                } else {
+                    "Okay. I opened Gmail."
+                }
+            is AssistantCommand.GmailClose ->
+                if (command.language == AppLanguage.PERSIAN) {
+                    "باشه. جیمیل را بستم و برگشتم."
+                } else {
+                    "Okay. I closed Gmail and came back."
+                }
             is AssistantCommand.Unknown ->
                 if (command.language == AppLanguage.PERSIAN) {
-                    "متوجه نشدم. می‌تونی بگی ساعت، هوا یا چراغ‌قوه؟"
+                    "متوجه نشدم. می‌تونی بگی ساعت، هوا، چراغ‌قوه، دوربین یا جیمیل؟"
                 } else {
-                    "I didn't catch that. You can say time, weather, or flashlight."
+                    "I didn't catch that. You can say time, weather, flashlight, camera, or Gmail."
                 }
         }
     }

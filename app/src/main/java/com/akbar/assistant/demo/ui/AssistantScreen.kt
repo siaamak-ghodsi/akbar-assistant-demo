@@ -129,7 +129,7 @@ fun AssistantScreen(
     ) {
         // Brand title for employer demo
         Text(
-            text = "Hey Akbar",
+            text = "intel tech",
             color = Ink.copy(alpha = 0.94f),
             fontSize = 22.sp,
             fontWeight = FontWeight.Medium,
@@ -324,6 +324,12 @@ fun AssistantScreen(
                 }
                 TextButton(onClick = { onTestCommand(AssistantCommand.LightOn(AppLanguage.ENGLISH)) }) {
                     Text("Light")
+                }
+                TextButton(onClick = { onTestCommand(AssistantCommand.CameraOn(AppLanguage.PERSIAN)) }) {
+                    Text("دوربین")
+                }
+                TextButton(onClick = { onTestCommand(AssistantCommand.GmailOpen(AppLanguage.PERSIAN)) }) {
+                    Text("جیمیل")
                 }
             }
         }
