@@ -61,29 +61,12 @@ class AppLauncher(private val context: Context) {
     fun closeGmail(): Result = bringDemoToFront()
 
     private fun bringDemoToFront(): Result {
-        // Prefer the Activity-created PendingIntent (works from background on Android 10+).
-        if (HandoffCoordinator.returnToDemo()) {
-            return Result.CLOSED
-        }
+        // Route through the FGS so Android is more likely to allow the activity start.
         return try {
-            val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            if (launch != null) {
-                launch.addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP,
-                )
-                context.startActivity(launch)
-                Result.CLOSED
-            } else {
-                val home = Intent(Intent.ACTION_MAIN).apply {
-                    addCategory(Intent.CATEGORY_HOME)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(home)
-                Result.CLOSED
-            }
+            HandoffCoordinator.requestReturn(context)
+            // Also try immediately from this process (PendingIntent + startActivity).
+            HandoffCoordinator.returnToDemo(context)
+            Result.CLOSED
         } catch (_: Exception) {
             Result.ERROR
         }
