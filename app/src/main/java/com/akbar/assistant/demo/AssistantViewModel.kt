@@ -1,1 +1,1 @@
-LOADING
+@/tmp/avm_content.txt
