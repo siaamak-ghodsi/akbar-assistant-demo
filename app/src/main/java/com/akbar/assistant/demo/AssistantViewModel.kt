@@ -1,5 +1,1 @@
-package test
-
-fun foo(x: List<String>): Map<String, Int> {
-    return mapOf("a" to 1)
-}
+__CURSOR_READ_FILE__:/workspace/.tmp_push/_content_only.kt
