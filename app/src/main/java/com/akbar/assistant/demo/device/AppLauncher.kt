@@ -31,6 +31,7 @@ class AppLauncher(private val context: Context) {
         for (intent in intents) {
             if (launch(intent)) return Result.OPENED
         }
+        // Last resort: open any installed camera package.
         val packages = listOf(
             "com.google.android.GoogleCamera",
             "com.android.camera",
@@ -49,6 +50,7 @@ class AppLauncher(private val context: Context) {
 
     fun openGmail(): Result {
         if (launchPackage("com.google.android.gm")) return Result.OPENED
+        // Fallback: mailto opens Gmail chooser / default mail app.
         val mailto = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("mailto:")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -59,6 +61,7 @@ class AppLauncher(private val context: Context) {
     fun closeGmail(): Result = bringDemoToFront()
 
     private fun bringDemoToFront(): Result {
+        // Prefer the Activity-created PendingIntent (works from background on Android 10+).
         if (HandoffCoordinator.returnToDemo()) {
             return Result.CLOSED
         }
