@@ -1,1 +1,1 @@
-PLACEHOLDER_LOAD_FROM_FILE
+@file:///workspace/.tmp_push/_content_only.kt
