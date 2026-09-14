@@ -51,16 +51,16 @@ object CommandParser {
     fun normalize(text: String): String {
         return text.trim()
             .lowercase(Locale.ROOT)
-            .replace('ي', 'ی')
-            .replace('ك', 'ک')
-            .replace('ۀ', 'ه')
-            .replace('ة', 'ه')
-            .replace('ؤ', 'و')
-            .replace('أ', 'ا')
-            .replace('إ', 'ا')
-            .replace('آ', 'ا')
-            .replace('‌', ' ')
-            .replace(Regex("[؟?!,.،؛:\"'…\\-_/\\\\()\\[\\]{}]"), " ")
+            .replace('\u064a', '\u06cc')
+            .replace('\u0643', '\u06a9')
+            .replace('\u06c0', '\u0647')
+            .replace('\u0629', '\u0647')
+            .replace('\u0624', '\u0648')
+            .replace('\u0623', '\u0627')
+            .replace('\u0625', '\u0627')
+            .replace('\u0622', '\u0627')
+            .replace('\u200c', ' ')
+            .replace(Regex("[\u061f?!,.\u060c\u061b:\"'\u2026\\-_/\\\\()\\[\\]{}]"), " ")
             .replace(Regex("\\s+"), " ")
             .trim()
     }
@@ -69,24 +69,28 @@ object CommandParser {
         val n = normalize(text)
         val compact = n.replace(" ", "")
         val phrases = listOf(
-            "هی اکبر", "هی اگبر", "هی اقبر", "های اکبر", "سلام اکبر", "اکبر جان",
-            "یا اکبر", "ای اکبر", "اهای اکبر", "هی akbar", "hey اکبر",
+            "\u0647\u06cc \u0627\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06af\u0628\u0631", "\u0647\u06cc \u0627\u0642\u0628\u0631", "\u0647\u0627\u06cc \u0627\u06a9\u0628\u0631", "\u062d\u06cc \u0627\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06a9 \u0628\u0631",
+            "\u0647\u06cc\u200c\u0627\u06a9\u0628\u0631", "\u0633\u0644\u0627\u0645 \u0627\u06a9\u0628\u0631", "\u0627\u06a9\u0628\u0631 \u062c\u0627\u0646", "\u06cc\u0627 \u0627\u06a9\u0628\u0631", "\u0627\u06cc \u0627\u06a9\u0628\u0631", "\u0627\u0647\u0627\u06cc \u0627\u06a9\u0628\u0631",
+            "\u0647\u06cc \u0627\u06a9\u0628\u0631\u0631", "\u0647\u06cc \u0627 \u06a9\u0628\u0631", "\u0647\u06cc \u0622\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06a9\u0628\u0627\u0631",
+            "\u0647\u06cc akbar", "hey \u0627\u06a9\u0628\u0631",
             "hey akbar", "hi akbar", "hay akbar", "okay akbar", "ok akbar",
             "hey akber", "hey aqbar", "hey ekbar", "yo akbar",
             "hey aakbar", "hei akbar", "he akbar", "a akbar",
         )
         if (phrases.any { n.contains(it) }) return true
-        if (compact.contains("هیاکبر") || compact.contains("هایاکبر") ||
+        if (compact.contains("\u0647\u06cc\u0627\u06a9\u0628\u0631") || compact.contains("\u0647\u0627\u06cc\u0627\u06a9\u0628\u0631") ||
+            compact.contains("\u062d\u06cc\u0627\u06a9\u0628\u0631") || compact.contains("\u0647\u06cc\u0627\u06a9\u0628\u0627\u0631") ||
+            compact.contains("\u0647\u06cc\u0627\u06a9\u0628\u0631\u0631") ||
             compact.contains("heyakbar") || compact.contains("hiakbar") ||
             compact.contains("hayakbar") || compact.contains("okakbar")
         ) {
             return true
         }
-        return n == "اکبر" || n == "اگبر" || n == "اقبر" ||
+        return n == "\u0627\u06a9\u0628\u0631" || n == "\u0627\u06af\u0628\u0631" || n == "\u0627\u0642\u0628\u0631" || n == "\u0622\u06a9\u0628\u0631" ||
             n == "akbar" || n == "akber" || n == "aqbar" || n == "ekbar" ||
             (n.split(" ").size <= 4 &&
-                (n.contains("اکبر") || n.contains("اگبر") || n.contains("اقبر") ||
-                    n.contains("akbar") || n.contains("akber")))
+                (n.contains("\u0627\u06a9\u0628\u0631") || n.contains("\u0627\u06af\u0628\u0631") || n.contains("\u0627\u0642\u0628\u0631") ||
+                    n.contains("\u0622\u06a9\u0628\u0631") || n.contains("akbar") || n.contains("akber")))
     }
 
     fun wakeLanguage(text: String): AppLanguage {
@@ -107,12 +111,14 @@ object CommandParser {
     fun stripWakeWord(text: String): String {
         var n = normalize(text)
         val wakes = listOf(
-            "هی اکبر", "هی اگبر", "هی اقبر", "های اکبر", "سلام اکبر", "اکبر جان",
-            "یا اکبر", "ای اکبر", "اهای اکبر", "hey اکبر", "هی akbar",
+            "\u0647\u06cc \u0627\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06af\u0628\u0631", "\u0647\u06cc \u0627\u0642\u0628\u0631", "\u0647\u0627\u06cc \u0627\u06a9\u0628\u0631", "\u062d\u06cc \u0627\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06a9 \u0628\u0631",
+            "\u0647\u06cc\u200c\u0627\u06a9\u0628\u0631", "\u0633\u0644\u0627\u0645 \u0627\u06a9\u0628\u0631", "\u0627\u06a9\u0628\u0631 \u062c\u0627\u0646",
+            "\u06cc\u0627 \u0627\u06a9\u0628\u0631", "\u0627\u06cc \u0627\u06a9\u0628\u0631", "\u0627\u0647\u0627\u06cc \u0627\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06a9\u0628\u0631\u0631", "\u0647\u06cc \u0622\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06a9\u0628\u0627\u0631",
+            "hey \u0627\u06a9\u0628\u0631", "\u0647\u06cc akbar",
             "hey akbar", "hi akbar", "hay akbar", "okay akbar", "ok akbar",
             "hey akber", "hey aqbar", "hey ekbar", "yo akbar", "hei akbar",
             "hey aakbar", "he akbar",
-            "اکبر", "اگبر", "اقبر", "akbar", "akber", "aqbar", "ekbar",
+            "\u0627\u06a9\u0628\u0631", "\u0627\u06af\u0628\u0631", "\u0627\u0642\u0628\u0631", "\u0622\u06a9\u0628\u0631", "akbar", "akber", "aqbar", "ekbar",
         )
         wakes.forEach { wake -> n = n.replace(wake, " ") }
         return n.replace(Regex("\\s+"), " ").trim()
@@ -166,20 +172,20 @@ object CommandParser {
     private fun isTime(n: String, compact: String, language: AppLanguage): Boolean {
         if (language == AppLanguage.PERSIAN) {
             val phrases = listOf(
-                "ساعت", "زمان", "ساعت چند", "ساعت چنده", "ساعت چند است",
-                "ساعت چند شد", "چه ساعتی", "چه ساعتیه", "الان ساعت",
-                "ساعت الان", "بگو ساعت", "ساعتو بگو", "ساعت را بگو",
-                "چند شده", "چند است الان", "ساعتو بگو ببینم",
+                "\u0633\u0627\u0639\u062a", "\u0632\u0645\u0627\u0646", "\u0633\u0627\u0639\u062a \u0686\u0646\u062f", "\u0633\u0627\u0639\u062a \u0686\u0646\u062f\u0647", "\u0633\u0627\u0639\u062a \u0686\u0646\u062f \u0627\u0633\u062a",
+                "\u0633\u0627\u0639\u062a \u0686\u0646\u062f \u0634\u062f", "\u0686\u0647 \u0633\u0627\u0639\u062a\u06cc", "\u0686\u0647 \u0633\u0627\u0639\u062a\u06cc\u0647", "\u0627\u0644\u0627\u0646 \u0633\u0627\u0639\u062a",
+                "\u0633\u0627\u0639\u062a \u0627\u0644\u0627\u0646", "\u0628\u06af\u0648 \u0633\u0627\u0639\u062a", "\u0633\u0627\u0639\u062a\u0648 \u0628\u06af\u0648", "\u0633\u0627\u0639\u062a \u0631\u0627 \u0628\u06af\u0648",
+                "\u0686\u0646\u062f \u0634\u062f\u0647", "\u0686\u0646\u062f \u0627\u0633\u062a \u0627\u0644\u0627\u0646", "\u0633\u0627\u0639\u062a\u0648 \u0628\u06af\u0648 \u0628\u0628\u06cc\u0646\u0645",
             )
             if (phrases.any { n.contains(it) }) return true
-            if (compact.contains("ساعتچند") || compact.contains("چندساعت") ||
-                compact.contains("چهساعتی") || compact == "زمان"
+            if (compact.contains("\u0633\u0627\u0639\u062a\u0686\u0646\u062f") || compact.contains("\u0686\u0646\u062f\u0633\u0627\u0639\u062a") ||
+                compact.contains("\u0686\u0647\u0633\u0627\u0639\u062a\u06cc") || compact == "\u0632\u0645\u0627\u0646"
             ) {
                 return true
             }
-            return n.contains("ساعت") && (
-                n.contains("چند") || n.contains("چه") || n.contains("الان") ||
-                    n.contains("بگو") || n.contains("است") || n.contains("شده")
+            return n.contains("\u0633\u0627\u0639\u062a") && (
+                n.contains("\u0686\u0646\u062f") || n.contains("\u0686\u0647") || n.contains("\u0627\u0644\u0627\u0646") ||
+                    n.contains("\u0628\u06af\u0648") || n.contains("\u0627\u0633\u062a") || n.contains("\u0634\u062f\u0647")
                 )
         }
         return n.contains("time") || n.contains("clock") || n.contains("what time") ||
@@ -193,20 +199,20 @@ object CommandParser {
     private fun isWeather(n: String, compact: String, language: AppLanguage): Boolean {
         if (language == AppLanguage.PERSIAN) {
             val phrases = listOf(
-                "هوا", "اب و هوا", "ابوهوا", "دما", "چند درجه",
-                "هوا چطور", "هوا چطوره", "هوا چطور است", "هوا چیه",
-                "هوا چی است", "هوا خوبه", "هوا خوب است", "وضعیت هوا",
-                "هوای امروز", "هوای بیرون", "درجه هوا", "گرم است",
-                "سرد است", "بارون", "باران", "پیش بینی هوا",
+                "\u0647\u0648\u0627", "\u0627\u0628 \u0648 \u0647\u0648\u0627", "\u0627\u0628\u0648\u0647\u0648\u0627", "\u062f\u0645\u0627", "\u0686\u0646\u062f \u062f\u0631\u062c\u0647",
+                "\u0647\u0648\u0627 \u0686\u0637\u0648\u0631", "\u0647\u0648\u0627 \u0686\u0637\u0648\u0631\u0647", "\u0647\u0648\u0627 \u0686\u0637\u0648\u0631 \u0627\u0633\u062a", "\u0647\u0648\u0627 \u0686\u06cc\u0647",
+                "\u0647\u0648\u0627 \u0686\u06cc \u0627\u0633\u062a", "\u0647\u0648\u0627 \u062e\u0648\u0628\u0647", "\u0647\u0648\u0627 \u062e\u0648\u0628 \u0627\u0633\u062a", "\u0648\u0636\u0639\u06cc\u062a \u0647\u0648\u0627",
+                "\u0647\u0648\u0627\u06cc \u0627\u0645\u0631\u0648\u0632", "\u0647\u0648\u0627\u06cc \u0628\u06cc\u0631\u0648\u0646", "\u062f\u0631\u062c\u0647 \u0647\u0648\u0627", "\u06af\u0631\u0645 \u0627\u0633\u062a",
+                "\u0633\u0631\u062f \u0627\u0633\u062a", "\u0628\u0627\u0631\u0648\u0646", "\u0628\u0627\u0631\u0627\u0646", "\u067e\u06cc\u0634 \u0628\u06cc\u0646\u06cc \u0647\u0648\u0627",
             )
             if (phrases.any { n.contains(it) }) return true
-            if (compact.contains("ابوهوا") || compact.contains("هواچطور") ||
-                compact.contains("هواچیه") || compact.contains("چنددرجه") ||
-                compact.contains("وضعیتهوا")
+            if (compact.contains("\u0627\u0628\u0648\u0647\u0648\u0627") || compact.contains("\u0647\u0648\u0627\u0686\u0637\u0648\u0631") ||
+                compact.contains("\u0647\u0648\u0627\u0686\u06cc\u0647") || compact.contains("\u0686\u0646\u062f\u062f\u0631\u062c\u0647") ||
+                compact.contains("\u0648\u0636\u0639\u06cc\u062a\u0647\u0648\u0627")
             ) {
                 return true
             }
-            return n.contains("هوا") || n.contains("دما") || n.contains("درجه")
+            return n.contains("\u0647\u0648\u0627") || n.contains("\u062f\u0645\u0627") || n.contains("\u062f\u0631\u062c\u0647")
         }
         return n.contains("weather") || n.contains("temperature") || n.contains("forecast") ||
             n.contains("how hot") || n.contains("how's the weather") ||
@@ -216,9 +222,9 @@ object CommandParser {
     }
 
     private fun mentionsLight(n: String): Boolean {
-        return n.contains("چراغ") || n.contains("لامپ") || n.contains("نور") ||
-            n.contains("فلش") || n.contains("چراغ قوه") || n.contains("چراغقوه") ||
-            n.contains("فلاش") || n.contains("light") || n.contains("lights") ||
+        return n.contains("\u0686\u0631\u0627\u063a") || n.contains("\u0644\u0627\u0645\u067e") || n.contains("\u0646\u0648\u0631") ||
+            n.contains("\u0641\u0644\u0634") || n.contains("\u0686\u0631\u0627\u063a \u0642\u0648\u0647") || n.contains("\u0686\u0631\u0627\u063a\u0642\u0648\u0647") ||
+            n.contains("\u0641\u0644\u0627\u0634") || n.contains("light") || n.contains("lights") ||
             n.contains("lamp") || n.contains("bulb") || n.contains("flashlight") ||
             n.contains("torch") || n.contains("flash") || n.contains("flash light")
     }
@@ -226,9 +232,9 @@ object CommandParser {
     private fun isLightOn(n: String, language: AppLanguage): Boolean {
         if (!mentionsLight(n)) return false
         if (language == AppLanguage.PERSIAN) {
-            return n.contains("روشن") || n.contains("باز کن") || n.contains("بازکن") ||
-                n.contains("فعال") || n.contains("روشن کن") || n.contains("روشنکن") ||
-                n.contains("بزن") || n.contains("روشن شو") || n.contains("چراغ روشن")
+            return n.contains("\u0631\u0648\u0634\u0646") || n.contains("\u0628\u0627\u0632 \u06a9\u0646") || n.contains("\u0628\u0627\u0632\u06a9\u0646") ||
+                n.contains("\u0641\u0639\u0627\u0644") || n.contains("\u0631\u0648\u0634\u0646 \u06a9\u0646") || n.contains("\u0631\u0648\u0634\u0646\u06a9\u0646") ||
+                n.contains("\u0628\u0632\u0646") || n.contains("\u0631\u0648\u0634\u0646 \u0634\u0648") || n.contains("\u0686\u0631\u0627\u063a \u0631\u0648\u0634\u0646")
         }
         return (n.contains("turn on") || n.contains("switch on") || n.contains("enable") ||
             n.contains("light on") || n.contains("lights on") ||
@@ -239,24 +245,24 @@ object CommandParser {
     private fun isLightOff(n: String, language: AppLanguage): Boolean {
         if (!mentionsLight(n)) return false
         if (language == AppLanguage.PERSIAN) {
-            return n.contains("خاموش") || n.contains("ببند") || n.contains("قطع") ||
-                n.contains("بسته") || n.contains("خاموش کن") || n.contains("خاموشکن") ||
-                n.contains("ببندش") || n.contains("چراغ خاموش")
+            return n.contains("\u062e\u0627\u0645\u0648\u0634") || n.contains("\u0628\u0628\u0646\u062f") || n.contains("\u0642\u0637\u0639") ||
+                n.contains("\u0628\u0633\u062a\u0647") || n.contains("\u062e\u0627\u0645\u0648\u0634 \u06a9\u0646") || n.contains("\u062e\u0627\u0645\u0648\u0634\u06a9\u0646") ||
+                n.contains("\u0628\u0628\u0646\u062f\u0634") || n.contains("\u0686\u0631\u0627\u063a \u062e\u0627\u0645\u0648\u0634")
         }
         return n.contains("turn off") || n.contains("switch off") || n.contains("disable") ||
             n.contains("light off") || n.contains("lights off") ||
             n.contains("flashlight off") || Regex("\\boff\\b").containsMatchIn(n)
     }
     private fun mentionsCamera(n: String): Boolean {
-        return n.contains("دوربین") || n.contains("دوربين") || n.contains("camera") ||
+        return n.contains("\u062f\u0648\u0631\u0628\u06cc\u0646") || n.contains("\u062f\u0648\u0631\u0628\u064a\u0646") || n.contains("camera") ||
             n.contains("webcam") || n.contains("cam")
     }
 
     private fun isCameraOn(n: String, language: AppLanguage): Boolean {
         if (!mentionsCamera(n)) return false
         if (language == AppLanguage.PERSIAN) {
-            return n.contains("روشن") || n.contains("باز") || n.contains("فعال") ||
-                n.contains("شروع") || n.contains("بزن")
+            return n.contains("\u0631\u0648\u0634\u0646") || n.contains("\u0628\u0627\u0632") || n.contains("\u0641\u0639\u0627\u0644") ||
+                n.contains("\u0634\u0631\u0648\u0639") || n.contains("\u0628\u0632\u0646")
         }
         return n.contains("turn on") || n.contains("switch on") || n.contains("open") ||
             n.contains("start") || n.contains("enable") ||
@@ -266,27 +272,26 @@ object CommandParser {
     private fun isCameraOff(n: String, language: AppLanguage): Boolean {
         if (!mentionsCamera(n)) return false
         if (language == AppLanguage.PERSIAN) {
-            return n.contains("خاموش") || n.contains("ببند") || n.contains("قطع") ||
-                n.contains("متوقف") || n.contains("بسته")
+            return n.contains("\u062e\u0627\u0645\u0648\u0634") || n.contains("\u0628\u0628\u0646\u062f") || n.contains("\u0642\u0637\u0639") ||
+                n.contains("\u0645\u062a\u0648\u0642\u0641") || n.contains("\u0628\u0633\u062a\u0647")
         }
         return n.contains("turn off") || n.contains("switch off") || n.contains("close") ||
             n.contains("stop") || n.contains("disable") || Regex("\\boff\\b").containsMatchIn(n)
     }
 
     private fun mentionsGmail(n: String): Boolean {
-        return n.contains("جیمیل") || n.contains("جیميل") || n.contains("جی میل") ||
-            n.contains("ایمیل") || n.contains("ای ميل") ||
+        return n.contains("\u062c\u06cc\u0645\u06cc\u0644") || n.contains("\u062c\u06cc\u0645\u064a\u0644") || n.contains("\u062c\u06cc \u0645\u06cc\u0644") ||
+            n.contains("\u0627\u06cc\u0645\u06cc\u0644") || n.contains("\u0627\u06cc \u0645\u064a\u0644") ||
             n.contains("gmail") || n.contains("g mail") || n.contains("email") ||
             n.contains("inbox") || (n.contains("mail") && !n.contains("male"))
     }
 
     private fun isGmailOpen(n: String, language: AppLanguage): Boolean {
         if (!mentionsGmail(n)) return false
-        // Avoid matching plain "mail" weather? no.
         if (language == AppLanguage.PERSIAN) {
-            return n.contains("باز") || n.contains("روشن") || n.contains("باز کن") ||
-                n.contains("بازکن") || n.contains("بیار") || n.contains("نشان") ||
-                n.contains("اجرا") || n == "جیمیل" || n == "ایمیل" || n.contains("جیمیل رو")
+            return n.contains("\u0628\u0627\u0632") || n.contains("\u0631\u0648\u0634\u0646") || n.contains("\u0628\u0627\u0632 \u06a9\u0646") ||
+                n.contains("\u0628\u0627\u0632\u06a9\u0646") || n.contains("\u0628\u06cc\u0627\u0631") || n.contains("\u0646\u0634\u0627\u0646") ||
+                n.contains("\u0627\u062c\u0631\u0627") || n == "\u062c\u06cc\u0645\u06cc\u0644" || n == "\u0627\u06cc\u0645\u06cc\u0644" || n.contains("\u062c\u06cc\u0645\u06cc\u0644 \u0631\u0648")
         }
         return n.contains("open") || n.contains("launch") || n.contains("start") ||
             n.contains("show") || n.contains("turn on") ||
@@ -296,8 +301,8 @@ object CommandParser {
     private fun isGmailClose(n: String, language: AppLanguage): Boolean {
         if (!mentionsGmail(n)) return false
         if (language == AppLanguage.PERSIAN) {
-            return n.contains("ببند") || n.contains("خاموش") || n.contains("بسته") ||
-                n.contains("قطع") || n.contains("ببندش")
+            return n.contains("\u0628\u0628\u0646\u062f") || n.contains("\u062e\u0627\u0645\u0648\u0634") || n.contains("\u0628\u0633\u062a\u0647") ||
+                n.contains("\u0642\u0637\u0639") || n.contains("\u0628\u0628\u0646\u062f\u0634")
         }
         return n.contains("close") || n.contains("quit") || n.contains("exit") ||
             n.contains("turn off") || n.contains("stop")
@@ -307,11 +312,11 @@ object CommandParser {
 
 object ResponseBuilder {
 
-    private val persianDigits = charArrayOf('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹')
+    private val persianDigits = charArrayOf('\u06f0', '\u06f1', '\u06f2', '\u06f3', '\u06f4', '\u06f5', '\u06f6', '\u06f7', '\u06f8', '\u06f9')
 
     fun activationPrompt(language: AppLanguage): String {
         return if (language == AppLanguage.PERSIAN) {
-            "بله، بفرمایید. می‌توانید بگویید ساعت، هوا، چراغ‌قوه، دوربین یا جیمیل."
+            "\u0628\u0644\u0647\u060c \u0628\u0641\u0631\u0645\u0627\u06cc\u06cc\u062f. \u0645\u06cc\u200c\u062a\u0648\u0627\u0646\u06cc\u062f \u0628\u06af\u0648\u06cc\u06cc\u062f \u0633\u0627\u0639\u062a\u060c \u0647\u0648\u0627\u060c \u0686\u0631\u0627\u063a\u200c\u0642\u0648\u0647\u060c \u062f\u0648\u0631\u0628\u06cc\u0646 \u06cc\u0627 \u062c\u06cc\u0645\u06cc\u0644."
         } else {
             "Yes? You can ask about time, weather, flashlight, camera, or Gmail."
         }
@@ -323,43 +328,43 @@ object ResponseBuilder {
             is AssistantCommand.Weather -> weather(command.language)
             is AssistantCommand.LightOn ->
                 if (command.language == AppLanguage.PERSIAN) {
-                    "حتماً. چراغ‌قوه الان روشن شد."
+                    "\u062d\u062a\u0645\u0627\u064b. \u0686\u0631\u0627\u063a\u200c\u0642\u0648\u0647 \u0627\u0644\u0627\u0646 \u0631\u0648\u0634\u0646 \u0634\u062f."
                 } else {
                     "Sure. The flashlight is on now."
                 }
             is AssistantCommand.LightOff ->
                 if (command.language == AppLanguage.PERSIAN) {
-                    "باشه. چراغ‌قوه خاموش شد."
+                    "\u0628\u0627\u0634\u0647. \u0686\u0631\u0627\u063a\u200c\u0642\u0648\u0647 \u062e\u0627\u0645\u0648\u0634 \u0634\u062f."
                 } else {
                     "Okay. The flashlight is off."
                 }
             is AssistantCommand.CameraOn ->
                 if (command.language == AppLanguage.PERSIAN) {
-                    "باشه. دوربین را باز کردم."
+                    "\u0628\u0627\u0634\u0647. \u062f\u0648\u0631\u0628\u06cc\u0646 \u0631\u0627 \u0628\u0627\u0632 \u06a9\u0631\u062f\u0645."
                 } else {
                     "Okay. I opened the camera."
                 }
             is AssistantCommand.CameraOff ->
                 if (command.language == AppLanguage.PERSIAN) {
-                    "باشه. از دوربین برگشتم."
+                    "\u0628\u0627\u0634\u0647. \u0627\u0632 \u062f\u0648\u0631\u0628\u06cc\u0646 \u0628\u0631\u06af\u0634\u062a\u0645."
                 } else {
                     "Okay. I closed the camera and came back."
                 }
             is AssistantCommand.GmailOpen ->
                 if (command.language == AppLanguage.PERSIAN) {
-                    "باشه. جیمیل را باز کردم."
+                    "\u0628\u0627\u0634\u0647. \u062c\u06cc\u0645\u06cc\u0644 \u0631\u0627 \u0628\u0627\u0632 \u06a9\u0631\u062f\u0645."
                 } else {
                     "Okay. I opened Gmail."
                 }
             is AssistantCommand.GmailClose ->
                 if (command.language == AppLanguage.PERSIAN) {
-                    "باشه. جیمیل را بستم و برگشتم."
+                    "\u0628\u0627\u0634\u0647. \u062c\u06cc\u0645\u06cc\u0644 \u0631\u0627 \u0628\u0633\u062a\u0645 \u0648 \u0628\u0631\u06af\u0634\u062a\u0645."
                 } else {
                     "Okay. I closed Gmail and came back."
                 }
             is AssistantCommand.Unknown ->
                 if (command.language == AppLanguage.PERSIAN) {
-                    "متوجه نشدم. می‌تونی بگی ساعت، هوا، چراغ‌قوه، دوربین یا جیمیل؟"
+                    "\u0645\u062a\u0648\u062c\u0647 \u0646\u0634\u062f\u0645. \u0645\u06cc\u200c\u062a\u0648\u0646\u06cc \u0628\u06af\u06cc \u0633\u0627\u0639\u062a\u060c \u0647\u0648\u0627\u060c \u0686\u0631\u0627\u063a\u200c\u0642\u0648\u0647\u060c \u062f\u0648\u0631\u0628\u06cc\u0646 \u06cc\u0627 \u062c\u06cc\u0645\u06cc\u0644\u061f"
                 } else {
                     "I didn't catch that. You can say time, weather, flashlight, camera, or Gmail."
                 }
@@ -380,12 +385,12 @@ object ResponseBuilder {
             val hour = cal.get(Calendar.HOUR_OF_DAY)
             val minute = cal.get(Calendar.MINUTE)
             val spoken =
-                "الان ساعت ${persianNumberWords(hour)} و ${persianNumberWords(minute)} دقیقه است."
+                "\u0627\u0644\u0627\u0646 \u0633\u0627\u0639\u062a ${persianNumberWords(hour)} \u0648 ${persianNumberWords(minute)} \u062f\u0642\u06cc\u0642\u0647 \u0627\u0633\u062a."
             val display = toPersianDigits(
                 String.format(Locale.US, "%02d:%02d", hour, minute),
             )
-            "$spoken اگر روی صفحه نگاه کنید، ساعت نمایشی $display است. " +
-                "اگر کار دیگری مثل هوا یا چراغ‌قوه دارید، بفرمایید."
+            "$spoken \u0627\u06af\u0631 \u0631\u0648\u06cc \u0635\u0641\u062d\u0647 \u0646\u06af\u0627\u0647 \u06a9\u0646\u06cc\u062f\u060c \u0633\u0627\u0639\u062a \u0646\u0645\u0627\u06cc\u0634\u06cc $display \u0627\u0633\u062a. " +
+                "\u0627\u06af\u0631 \u06a9\u0627\u0631 \u062f\u06cc\u06af\u0631\u06cc \u0645\u062b\u0644 \u0647\u0648\u0627 \u06cc\u0627 \u0686\u0631\u0627\u063a\u200c\u0642\u0648\u0647 \u062f\u0627\u0631\u06cc\u062f\u060c \u0628\u0641\u0631\u0645\u0627\u06cc\u06cc\u062f."
         } else {
             val t = SimpleDateFormat("h:mm a", Locale.US).format(Date())
             "Right now it's $t. You can also ask about the weather or the flashlight."
@@ -394,11 +399,11 @@ object ResponseBuilder {
 
     private fun weather(language: AppLanguage): String {
         return if (language == AppLanguage.PERSIAN) {
-            "وضعیت هوای امروز این‌طور است: آسمان صاف و آفتابی است، " +
-                "دمای هوا حدود بیست و هشت درجه سانتی‌گراد است، " +
-                "رطوبت نسبی کم است و باد ملایمی می‌وزد. " +
-                "برای بیرون رفتن هوای خوبی دارید و نیازی به چتر نیست. " +
-                "اگر بخواهید ساعت را هم بگویم، کافی است بپرسید."
+            "\u0648\u0636\u0639\u06cc\u062a \u0647\u0648\u0627\u06cc \u0627\u0645\u0631\u0648\u0632 \u0627\u06cc\u0646\u200c\u0637\u0648\u0631 \u0627\u0633\u062a: \u0622\u0633\u0645\u0627\u0646 \u0635\u0627\u0641 \u0648 \u0622\u0641\u062a\u0627\u0628\u06cc \u0627\u0633\u062a\u060c " +
+                "\u062f\u0645\u0627\u06cc \u0647\u0648\u0627 \u062d\u062f\u0648\u062f \u0628\u06cc\u0633\u062a \u0648 \u0647\u0634\u062a \u062f\u0631\u062c\u0647 \u0633\u0627\u0646\u062a\u06cc\u200c\u06af\u0631\u0627\u062f \u0627\u0633\u062a\u060c " +
+                "\u0631\u0637\u0648\u0628\u062a \u0646\u0633\u0628\u06cc \u06a9\u0645 \u0627\u0633\u062a \u0648 \u0628\u0627\u062f \u0645\u0644\u0627\u06cc\u0645\u06cc \u0645\u06cc\u200c\u0648\u0632\u062f. " +
+                "\u0628\u0631\u0627\u06cc \u0628\u06cc\u0631\u0648\u0646 \u0631\u0641\u062a\u0646 \u0647\u0648\u0627\u06cc \u062e\u0648\u0628\u06cc \u062f\u0627\u0631\u06cc\u062f \u0648 \u0646\u06cc\u0627\u0632\u06cc \u0628\u0647 \u0686\u062a\u0631 \u0646\u06cc\u0633\u062a. " +
+                "\u0627\u06af\u0631 \u0628\u062e\u0648\u0627\u0647\u06cc\u062f \u0633\u0627\u0639\u062a \u0631\u0627 \u0647\u0645 \u0628\u06af\u0648\u06cc\u0645\u060c \u06a9\u0627\u0641\u06cc \u0627\u0633\u062a \u0628\u067e\u0631\u0633\u06cc\u062f."
         } else {
             "Today's weather looks clear and sunny, around 28 degrees Celsius, " +
                 "with low humidity and a light breeze. It's a nice day to be outside. " +
@@ -409,15 +414,15 @@ object ResponseBuilder {
     private fun persianNumberWords(n: Int): String {
         val value = ((n % 100) + 100) % 100
         val ones = arrayOf(
-            "صفر", "یک", "دو", "سه", "چهار", "پنج", "شش", "هفت", "هشت", "نه",
-            "ده", "یازده", "دوازده", "سیزده", "چهارده", "پانزده", "شانزده",
-            "هفده", "هجده", "نوزده",
+            "\u0635\u0641\u0631", "\u06cc\u06a9", "\u062f\u0648", "\u0633\u0647", "\u0686\u0647\u0627\u0631", "\u067e\u0646\u062c", "\u0634\u0634", "\u0647\u0641\u062a", "\u0647\u0634\u062a", "\u0646\u0647",
+            "\u062f\u0647", "\u06cc\u0627\u0632\u062f\u0647", "\u062f\u0648\u0627\u0632\u062f\u0647", "\u0633\u06cc\u0632\u062f\u0647", "\u0686\u0647\u0627\u0631\u062f\u0647", "\u067e\u0627\u0646\u0632\u062f\u0647", "\u0634\u0627\u0646\u0632\u062f\u0647",
+            "\u0647\u0641\u062f\u0647", "\u0647\u062c\u062f\u0647", "\u0646\u0648\u0632\u062f\u0647",
         )
-        val tens = arrayOf("", "", "بیست", "سی", "چهل", "پنجاه", "شصت", "هفتاد", "هشتاد", "نود")
+        val tens = arrayOf("", "", "\u0628\u06cc\u0633\u062a", "\u0633\u06cc", "\u0686\u0647\u0644", "\u067e\u0646\u062c\u0627\u0647", "\u0634\u0635\u062a", "\u0647\u0641\u062a\u0627\u062f", "\u0647\u0634\u062a\u0627\u062f", "\u0646\u0648\u062f")
         return when {
             value < 20 -> ones[value]
             value % 10 == 0 -> tens[value / 10]
-            else -> "${tens[value / 10]} و ${ones[value % 10]}"
+            else -> "${tens[value / 10]} \u0648 ${ones[value % 10]}"
         }
     }
 }
