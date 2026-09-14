@@ -27,6 +27,14 @@
             <action android:name="android.speech.tts.engine.CHECK_TTS_DATA" />
         </intent>
         <package android:name="com.google.android.tts" />
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.STILL_IMAGE_CAMERA" />
+        </intent>
+        <package android:name="com.google.android.gm" />
+        <package android:name="com.google.android.GoogleCamera" />
     </queries>
 
     <application
