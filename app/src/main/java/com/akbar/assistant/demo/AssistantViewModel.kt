@@ -9,6 +9,7 @@ import com.akbar.assistant.demo.commands.ResponseBuilder
 import com.akbar.assistant.demo.device.AppLauncher
 import com.akbar.assistant.demo.device.FlashlightController
 import com.akbar.assistant.demo.handoff.HandoffCoordinator
+import com.akbar.assistant.demo.handoff.HandoffListenService
 import com.akbar.assistant.demo.speech.AssistantTts
 import com.akbar.assistant.demo.speech.ContinuousSpeechRecognizer
 import java.util.Locale
@@ -170,11 +171,17 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun onAppForeground() {
-        if (HandoffCoordinator.active) {
-            HandoffCoordinator.endHandoff(getApplication())
-        }
+        // Always clear leftover handoff FGS / call-style notifications so the
+        // wake-word mic can start cleanly.
+        HandoffCoordinator.endHandoff(getApplication())
+        HandoffListenService.cancelNotifications(getApplication())
+
         if (!_uiState.value.permissionGranted) return
         try {
+            speaking = false
+            // Recreate the recognizer — after handoff/FGS it can be stuck busy.
+            speech?.destroy()
+            speech = null
             if (sessionActive) startCommandListening() else enterWakeMode(_uiState.value.language)
         } catch (e: Exception) {
             _uiState.update { it.copy(errorMessage = e.message) }

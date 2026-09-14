@@ -9,16 +9,16 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.akbar.assistant.demo.MainActivity
 import com.akbar.assistant.demo.R
 
 /**
- * Foreground mic service while Camera/Gmail is open.
- * Also owns the most reliable return-to-demo paths (FGS startActivity +
- * full-screen / high-priority notification PendingIntent).
+ * Foreground service while Camera/Gmail is open so we can keep listening and
+ * return to MainActivity. Does NOT use CATEGORY_CALL (that breaks wake listening).
  */
 class HandoffListenService : Service() {
 
@@ -27,22 +27,18 @@ class HandoffListenService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                cleanupAndStop()
                 return START_NOT_STICKY
             }
             ACTION_RETURN -> {
                 ensureChannels()
-                // Keep FGS alive briefly so BAL / startActivity are more likely to work.
                 startAsForeground(buildListeningNotification())
                 performReturn()
-                // Stop handoff after a short moment so the activity can finish coming forward.
-                applicationContext.mainExecutor.execute {
-                    android.os.Handler(mainLooper).postDelayed({
-                        HandoffCoordinator.endHandoff(this)
-                    }, 800)
-                }
-                return START_STICKY
+                // End handoff after the activity has a chance to come forward.
+                Handler(Looper.getMainLooper()).postDelayed({
+                    HandoffCoordinator.endHandoff(applicationContext)
+                }, 600)
+                return START_NOT_STICKY
             }
             else -> {
                 ensureChannels()
@@ -52,14 +48,17 @@ class HandoffListenService : Service() {
         }
     }
 
+    private fun cleanupAndStop() {
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (_: Exception) {
+        }
+        cancelNotifications(this)
+        stopSelf()
+    }
+
     private fun startAsForeground(notification: Notification) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
-            )
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIFICATION_ID,
                 notification,
@@ -73,12 +72,12 @@ class HandoffListenService : Service() {
     private fun performReturn() {
         Log.i(TAG, "performReturn")
         HandoffCoordinator.returnToDemo(this)
-        // Extra direct attempt from the Service itself.
         try {
             startActivity(HandoffCoordinator.launchIntent(this))
         } catch (e: Exception) {
             Log.w(TAG, "service startActivity failed", e)
         }
+        // Mild heads-up only — never CATEGORY_CALL (blocks SpeechRecognizer on many OEMs).
         fireReturnNotification(this)
     }
 
@@ -93,6 +92,7 @@ class HandoffListenService : Service() {
             ).apply {
                 description = "Keeps listening while Camera or Gmail is open"
                 setShowBadge(false)
+                setSound(null, null)
             },
         )
         mgr.createNotificationChannel(
@@ -139,6 +139,7 @@ class HandoffListenService : Service() {
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setSilent(true)
             .addAction(0, "بازگشت", returnAction)
             .build()
     }
@@ -162,19 +163,29 @@ class HandoffListenService : Service() {
         }
 
         fun stop(context: Context) {
-            val intent = Intent(context, HandoffListenService::class.java).setAction(ACTION_STOP)
+            cancelNotifications(context)
             try {
-                context.startService(intent)
+                context.startService(
+                    Intent(context, HandoffListenService::class.java).setAction(ACTION_STOP),
+                )
             } catch (_: Exception) {
             }
-            context.stopService(Intent(context, HandoffListenService::class.java))
+            try {
+                context.stopService(Intent(context, HandoffListenService::class.java))
+            } catch (_: Exception) {
+            }
+        }
+
+        fun cancelNotifications(context: Context) {
+            val mgr = context.getSystemService(NotificationManager::class.java) ?: return
+            mgr.cancel(NOTIFICATION_ID)
+            mgr.cancel(RETURN_NOTIFICATION_ID)
         }
 
         fun requestReturn(context: Context) {
             val intent = Intent(context, HandoffListenService::class.java).setAction(ACTION_RETURN)
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    // May throw if FGS already running — fall back to startService.
                     try {
                         context.startForegroundService(intent)
                     } catch (_: Exception) {
@@ -189,7 +200,11 @@ class HandoffListenService : Service() {
             }
         }
 
-        /** High-priority / full-screen intent — strongest background→foreground path. */
+        /**
+         * High-priority heads-up to help bring the app forward.
+         * Avoid CATEGORY_CALL / aggressive full-screen — they break wake-word mic
+         * on many devices after returning.
+         */
         fun fireReturnNotification(context: Context) {
             val mgr = context.getSystemService(NotificationManager::class.java) ?: return
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -206,7 +221,7 @@ class HandoffListenService : Service() {
             }
             val launch = HandoffCoordinator.launchIntent(context)
             val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            val fullScreen = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val pi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 val options = android.app.ActivityOptions.makeBasic().apply {
                     setPendingIntentCreatorBackgroundActivityStartMode(
                         android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED,
@@ -218,18 +233,17 @@ class HandoffListenService : Service() {
             }
             val notification = NotificationCompat.Builder(context, RETURN_CHANNEL_ID)
                 .setContentTitle("intel tech")
-                .setContentText("بازگشت به intel tech")
+                .setContentText("بازگشت به intel tech — لمس کنید")
                 .setSmallIcon(R.drawable.ic_mic_notify)
-                .setContentIntent(fullScreen)
-                .setFullScreenIntent(fullScreen, true)
+                .setContentIntent(pi)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
                 .setAutoCancel(true)
-                .setTimeoutAfter(4_000)
+                .setTimeoutAfter(3_000)
+                .setSilent(true)
                 .build()
             mgr.notify(RETURN_NOTIFICATION_ID, notification)
 
-            // Also try sending the notification PendingIntent directly.
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     val options = android.app.ActivityOptions.makeBasic().apply {
@@ -237,12 +251,12 @@ class HandoffListenService : Service() {
                             android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED,
                         )
                     }
-                    fullScreen.send(context, 0, null, null, null, null, options.toBundle())
+                    pi.send(context, 0, null, null, null, null, options.toBundle())
                 } else {
-                    fullScreen.send()
+                    pi.send()
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "fullScreen send failed", e)
+                Log.w(TAG, "return PI send failed", e)
             }
         }
     }
