@@ -48,8 +48,14 @@ object HandoffCoordinator {
 
     fun endHandoff(context: Context) {
         active = false
+        // Stop FGS + listening notif only. Do NOT cancel the return notification here —
+        // v1.9.3 cancelled it in the same turn as fireReturnNotification and broke return.
         HandoffListenService.stop(context)
-        HandoffListenService.cancelNotifications(context)
+    }
+
+    /** Call from Activity onStart after we are actually in front. */
+    fun clearReturnNotifications(context: Context) {
+        HandoffListenService.cancelReturnNotification(context)
     }
 
     /**
@@ -132,7 +138,8 @@ object HandoffCoordinator {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
             )
         }
     }
