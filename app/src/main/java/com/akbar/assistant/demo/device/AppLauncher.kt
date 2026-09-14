@@ -5,12 +5,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
+import com.akbar.assistant.demo.handoff.HandoffCoordinator
 
 /**
  * Opens/closes external apps for the smart-board demo.
  *
  * Android does not allow killing other apps. "Close" brings our demo
- * (or the home screen) back to the foreground — good enough for a live demo.
+ * back to the foreground via a PendingIntent created while we were visible.
  */
 class AppLauncher(private val context: Context) {
 
@@ -30,7 +31,6 @@ class AppLauncher(private val context: Context) {
         for (intent in intents) {
             if (launch(intent)) return Result.OPENED
         }
-        // Last resort: open any installed camera package.
         val packages = listOf(
             "com.google.android.GoogleCamera",
             "com.android.camera",
@@ -49,7 +49,6 @@ class AppLauncher(private val context: Context) {
 
     fun openGmail(): Result {
         if (launchPackage("com.google.android.gm")) return Result.OPENED
-        // Fallback: mailto opens Gmail chooser / default mail app.
         val mailto = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("mailto:")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -60,11 +59,15 @@ class AppLauncher(private val context: Context) {
     fun closeGmail(): Result = bringDemoToFront()
 
     private fun bringDemoToFront(): Result {
+        if (HandoffCoordinator.returnToDemo()) {
+            return Result.CLOSED
+        }
         return try {
             val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
             if (launch != null) {
                 launch.addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP,
                 )
