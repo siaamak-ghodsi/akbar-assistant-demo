@@ -6,7 +6,7 @@ on:
       tag:
         description: Release tag name
         required: false
-        default: v1.9.5
+        default: v1.9.6
   push:
     tags:
       - 'v*'
@@ -44,15 +44,15 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.9.5') }}
-          name: intel tech Demo v1.9.5
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.9.6') }}
+          name: intel tech Demo v1.9.6
           body: |
             Debug APK for the **intel tech** smart-board demo.
 
             - App name & icon: **intel tech**
-            - Wake: «هی اکبر» / Hey Akbar — live transcript + Persian-first ASR
-            - **Multi-command session restored** (v1.9.2 recognizer reuse)
-            - **Voice return from Camera/Gmail restored** (full-screen return intent)
+            - Wake: «هی اینتل تک» / Hey intel tech (also bare «اینتل تک» / intel tech)
+            - Live transcript + Persian-first ASR
+            - Multi-command session + Camera/Gmail voice return
             - Commands: time, weather, flashlight, camera on/off, Gmail open/close
             - 120s session after wake
 

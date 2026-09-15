@@ -13,7 +13,7 @@ import java.util.Locale
 /**
  * Continuous SpeechRecognizer loop with beep silencing and bilingual wake support.
  * While waiting for the wake word, locales prefer fa-IR (3 cycles) with occasional
- * en-US so both «هی اکبر» and "Hey Akbar" can be recognized.
+ * en-US so both «هی اینتل تک» and "Hey intel tech" can be recognized.
  */
 class ContinuousSpeechRecognizer(
     private val context: Context,
@@ -30,7 +30,7 @@ class ContinuousSpeechRecognizer(
     private val handler = Handler(Looper.getMainLooper())
     private var preferredLocale: Locale = Locale("fa", "IR")
     private var bilingualWake = false
-    /** Wake cycles: prefer fa-IR heavily so «هی اکبر» is not lost on en-US windows. */
+    /** Wake cycles: prefer fa-IR heavily so «هی اینتل تک» is not lost on en-US windows. */
     private var wakeCycle = 0
     private val beepSilencer = RecognitionBeepSilencer(context)
 
@@ -38,7 +38,7 @@ class ContinuousSpeechRecognizer(
         preferredLocale = locale
     }
 
-    /** Mostly fa-IR for wake, with occasional en-US for "Hey Akbar". */
+    /** Mostly fa-IR for wake, with occasional en-US for "Hey intel tech". */
     fun setBilingualWakeMode(enabled: Boolean) {
         bilingualWake = enabled
         if (enabled) wakeCycle = 0
