@@ -121,7 +121,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun simulateWake(language: AppLanguage) {
         onWakeDetected(
             language,
-            if (language == AppLanguage.PERSIAN) "هی اکبر" else "Hey Akbar"
+            if (language == AppLanguage.PERSIAN) "هی اینتل تک" else "Hey intel tech"
         )
     }
 
@@ -224,9 +224,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     "Session active — give a command"
                 },
                 hintText = if (language == AppLanguage.PERSIAN) {
-                    "دیگر لازم نیست هی اکبر بگویید"
+                    "دیگر لازم نیست هی اینتل تک بگویید"
                 } else {
-                    "No need to say Hey Akbar again"
+                    "No need to say Hey intel tech again"
                 }
             )
         }
@@ -239,7 +239,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         returnToWakeAfterSpeak = false
         if (!sessionActive) {
             ensureSpeech()
-            // Prefer fa-IR for «هی اکبر»; occasional en-US for "Hey Akbar".
+            // Prefer fa-IR for «هی اینتل تک»; occasional en-US for "Hey intel tech".
             speech?.setBilingualWakeMode(true)
             speech?.setPreferredLocale(Locale("fa", "IR"))
             speech?.start()
@@ -254,9 +254,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         "Listening"
                     },
                     hintText = if (language == AppLanguage.PERSIAN) {
-                        "بگویید هی اکبر / Hey Akbar — بعد دستور بدهید"
+                        "بگویید هی اینتل تک / Hey intel tech — بعد دستور بدهید"
                     } else {
-                        "Say Hey Akbar / هی اکبر — then give a command"
+                        "Say Hey intel tech / هی اینتل تک — then give a command"
                     },
                     lastHeard = "",
                     errorMessage = null,
@@ -660,9 +660,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     it.copy(
                         sessionActive = false,
                         statusText = if (language == AppLanguage.PERSIAN) {
-                            "جلسه تمام شد — دوباره هی اکبر بگویید"
+                            "جلسه تمام شد — دوباره هی اینتل تک بگویید"
                         } else {
-                            "Session ended — say Hey Akbar again"
+                            "Session ended — say Hey intel tech again"
                         }
                     )
                 }

@@ -36,7 +36,8 @@ object CommandParser {
 
     private fun looksEnglish(n: String): Boolean {
         val englishCues = listOf(
-            "hey akbar", "hi akbar", "hay akbar", "ok akbar", "okay akbar", "yo akbar",
+            "hey intel tech", "hi intel tech", "hey inteltek", "hey intel",
+            "intel tech", "inteltek", "intel tec",
             "what time", "weather", "temperature", "forecast", "flashlight",
             "turn on", "turn off", "switch on", "switch off", "lights",
             "camera", "gmail", "mail", "email",
@@ -68,41 +69,46 @@ object CommandParser {
     fun containsWakeWord(text: String): Boolean {
         val n = normalize(text)
         val compact = n.replace(" ", "")
+        // Primary: «هی اینتل تک» / "Hey intel tech" — also bare «اینتل تک» / "intel tech".
         val phrases = listOf(
-            "\u0647\u06cc \u0627\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06af\u0628\u0631", "\u0647\u06cc \u0627\u0642\u0628\u0631", "\u0647\u0627\u06cc \u0627\u06a9\u0628\u0631", "\u062d\u06cc \u0627\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06a9 \u0628\u0631",
-            "\u0647\u06cc\u200c\u0627\u06a9\u0628\u0631", "\u0633\u0644\u0627\u0645 \u0627\u06a9\u0628\u0631", "\u0627\u06a9\u0628\u0631 \u062c\u0627\u0646", "\u06cc\u0627 \u0627\u06a9\u0628\u0631", "\u0627\u06cc \u0627\u06a9\u0628\u0631", "\u0627\u0647\u0627\u06cc \u0627\u06a9\u0628\u0631",
-            "\u0647\u06cc \u0627\u06a9\u0628\u0631\u0631", "\u0647\u06cc \u0627 \u06a9\u0628\u0631", "\u0647\u06cc \u0622\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06a9\u0628\u0627\u0631",
-            "\u0647\u06cc akbar", "hey \u0627\u06a9\u0628\u0631",
-            "hey akbar", "hi akbar", "hay akbar", "okay akbar", "ok akbar",
-            "hey akber", "hey aqbar", "hey ekbar", "yo akbar",
-            "hey aakbar", "hei akbar", "he akbar", "a akbar",
+            "هی اینتل تک", "های اینتل تک", "حی اینتل تک", "هی این تلتک",
+            "هی اینتل تک", "هی اینتل‌تک", "هی این تِل تک",
+            "اینتل تک", "اینتلتک", "این تل تک", "اینتل‌تک",
+            "هی intel tech", "hey اینتل تک", "هی inteltek",
+            "hey intel tech", "hi intel tech", "hay intel tech",
+            "okay intel tech", "ok intel tech", "yo intel tech",
+            "hey inteltek", "hi inteltek", "hey intel tec", "hey intel tek",
+            "hey intel", "hi intel tech", "hei intel tech", "he intel tech",
+            "intel tech", "inteltek", "intel tec", "intel tek", "inteltech",
         )
         if (phrases.any { n.contains(it) }) return true
-        if (compact.contains("\u0647\u06cc\u0627\u06a9\u0628\u0631") || compact.contains("\u0647\u0627\u06cc\u0627\u06a9\u0628\u0631") ||
-            compact.contains("\u062d\u06cc\u0627\u06a9\u0628\u0631") || compact.contains("\u0647\u06cc\u0627\u06a9\u0628\u0627\u0631") ||
-            compact.contains("\u0647\u06cc\u0627\u06a9\u0628\u0631\u0631") ||
-            compact.contains("heyakbar") || compact.contains("hiakbar") ||
-            compact.contains("hayakbar") || compact.contains("okakbar")
+        if (compact.contains("هیاینتلتک") || compact.contains("هایاینتلتک") ||
+            compact.contains("حیاینتلتک") || compact.contains("اینتلتک") ||
+            compact.contains("heyinteltech") || compact.contains("hiinteltech") ||
+            compact.contains("inteltech") || compact.contains("inteltek")
         ) {
             return true
         }
-        return n == "\u0627\u06a9\u0628\u0631" || n == "\u0627\u06af\u0628\u0631" || n == "\u0627\u0642\u0628\u0631" || n == "\u0622\u06a9\u0628\u0631" ||
-            n == "akbar" || n == "akber" || n == "aqbar" || n == "ekbar" ||
-            (n.split(" ").size <= 4 &&
-                (n.contains("\u0627\u06a9\u0628\u0631") || n.contains("\u0627\u06af\u0628\u0631") || n.contains("\u0627\u0642\u0628\u0631") ||
-                    n.contains("\u0622\u06a9\u0628\u0631") || n.contains("akbar") || n.contains("akber")))
+        // Short utterance that is just the brand (or brand + hey).
+        val words = n.split(" ").filter { it.isNotBlank() }
+        return words.size <= 5 && (
+            (n.contains("اینتل") && (n.contains("تک") || n.contains("tech") || n.contains("tek") || n.contains("tec"))) ||
+                (n.contains("intel") && (n.contains("tech") || n.contains("tek") || n.contains("tec") || n.contains("تک")))
+            )
     }
 
     fun wakeLanguage(text: String): AppLanguage {
         val n = normalize(text)
         val englishWake = listOf(
-            "hey akbar", "hi akbar", "hay akbar", "okay akbar", "ok akbar",
-            "yo akbar", "hey akber", "hey aqbar", "hei akbar", "heyakbar", "hiakbar",
+            "hey intel tech", "hi intel tech", "hay intel tech", "okay intel tech",
+            "ok intel tech", "yo intel tech", "hey inteltek", "hey intel tec",
+            "hey intel tek", "hei intel tech", "heyinteltech", "hiinteltech",
+            "intel tech", "inteltek", "inteltech", "intel tec", "intel tek",
         )
         if (englishWake.any { n.contains(it) || n.replace(" ", "").contains(it.replace(" ", "")) }) {
             return AppLanguage.ENGLISH
         }
-        if (n == "akbar" || n == "akber" || n == "aqbar" || n == "ekbar") {
+        if (n == "intel" || n == "inteltech" || n == "inteltek") {
             return AppLanguage.ENGLISH
         }
         return detectLanguage(text)
@@ -110,15 +116,17 @@ object CommandParser {
 
     fun stripWakeWord(text: String): String {
         var n = normalize(text)
+        // Longer phrases first so "hey intel tech" is removed before "intel tech".
         val wakes = listOf(
-            "\u0647\u06cc \u0627\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06af\u0628\u0631", "\u0647\u06cc \u0627\u0642\u0628\u0631", "\u0647\u0627\u06cc \u0627\u06a9\u0628\u0631", "\u062d\u06cc \u0627\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06a9 \u0628\u0631",
-            "\u0647\u06cc\u200c\u0627\u06a9\u0628\u0631", "\u0633\u0644\u0627\u0645 \u0627\u06a9\u0628\u0631", "\u0627\u06a9\u0628\u0631 \u062c\u0627\u0646",
-            "\u06cc\u0627 \u0627\u06a9\u0628\u0631", "\u0627\u06cc \u0627\u06a9\u0628\u0631", "\u0627\u0647\u0627\u06cc \u0627\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06a9\u0628\u0631\u0631", "\u0647\u06cc \u0622\u06a9\u0628\u0631", "\u0647\u06cc \u0627\u06a9\u0628\u0627\u0631",
-            "hey \u0627\u06a9\u0628\u0631", "\u0647\u06cc akbar",
-            "hey akbar", "hi akbar", "hay akbar", "okay akbar", "ok akbar",
-            "hey akber", "hey aqbar", "hey ekbar", "yo akbar", "hei akbar",
-            "hey aakbar", "he akbar",
-            "\u0627\u06a9\u0628\u0631", "\u0627\u06af\u0628\u0631", "\u0627\u0642\u0628\u0631", "\u0622\u06a9\u0628\u0631", "akbar", "akber", "aqbar", "ekbar",
+            "هی اینتل تک", "های اینتل تک", "حی اینتل تک", "هی اینتلتک",
+            "هی این تل تک", "هی اینتل‌تک",
+            "hey intel tech", "hi intel tech", "hay intel tech",
+            "okay intel tech", "ok intel tech", "yo intel tech",
+            "hey inteltek", "hi inteltek", "hey intel tec", "hey intel tek",
+            "hei intel tech", "he intel tech", "hey intel",
+            "هی intel tech", "hey اینتل تک", "هی inteltek",
+            "اینتل تک", "اینتلتک", "این تل تک", "اینتل‌تک",
+            "intel tech", "inteltek", "intel tec", "intel tek", "inteltech",
         )
         wakes.forEach { wake -> n = n.replace(wake, " ") }
         return n.replace(Regex("\\s+"), " ").trim()
