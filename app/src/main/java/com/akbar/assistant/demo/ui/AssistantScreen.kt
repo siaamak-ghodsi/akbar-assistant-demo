@@ -219,9 +219,9 @@ fun AssistantScreen(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = if (state.state == AssistantState.LISTENING_WAKE) {
-                        "\u062f\u0631 \u0627\u0646\u062a\u0638\u0627\u0631 \u0647\u06cc \u0627\u06a9\u0628\u0631\u2026"
+                        "در انتظار هی اینتل تک…"
                     } else {
-                        "\u062f\u0631 \u062d\u0627\u0644 \u0634\u0646\u06cc\u062f\u0646\u2026"
+                        "در حال شنیدن…"
                     },
                     color = Muted,
                     fontSize = 14.sp,
@@ -266,7 +266,7 @@ fun AssistantScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "\u0628\u06af\u0648 \u0647\u06cc \u0627\u06a9\u0628\u0631 \u062a\u0627 \u0634\u0631\u0648\u0639 \u06a9\u0646\u06cc\u0645",
+                        text = "بگو هی اینتل تک تا شروع کنیم",
                         color = Muted,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
@@ -369,7 +369,7 @@ fun AssistantScreen(
                 OutlinedButton(
                     onClick = { onSimulateWake(AppLanguage.PERSIAN) },
                     shape = RoundedCornerShape(10.dp),
-                ) { Text("\u0627\u06a9\u0628\u0631") }
+                ) { Text("اینتل تک") }
                 OutlinedButton(
                     onClick = { onSimulateWake(AppLanguage.ENGLISH) },
                     shape = RoundedCornerShape(10.dp),
