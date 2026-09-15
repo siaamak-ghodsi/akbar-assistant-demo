@@ -2,7 +2,7 @@
 
 This demo reuses well-known open-source patterns instead of inventing speech plumbing from scratch:
 
-1. **[StephenVinouze/KontinuousSpeechRecognizer](https://github.com/StephenVinouze/KontinuousSpeechRecognizer)** — continuous `SpeechRecognizer` restart loop + wake-keyword gate (adapted to detect «هی اکبر» / "Hey Akbar").
+1. **[StephenVinouze/KontinuousSpeechRecognizer](https://github.com/StephenVinouze/KontinuousSpeechRecognizer)** — continuous `SpeechRecognizer` restart loop + wake-keyword gate (adapted to detect «هی اینتل تک» / "Hey intel tech").
 2. **[Android SpeechRecognizer API](https://developer.android.com/reference/android/speech/SpeechRecognizer)** + common continuous-listening restart pattern (restart after `onResults` / `ERROR_NO_MATCH` / timeout).
 3. **Android `TextToSpeech`** official API for bilingual `fa-IR` / `en-US` replies.
 4. **Jetpack Compose Material 3** dark UI (official Android samples / Compose BOM).
@@ -26,11 +26,11 @@ Only the bilingual command set, wake phrases, bulb status UI, and Test Mode are 
 4. Wait for Gradle sync (Android Studio downloads Gradle automatically).
 5. Use a **device/emulator with Google Play** (speech needs it). Grant **Microphone**.
 6. Run ▶ `app`.
-7. Say **«هی اکبر»** or **"Hey Akbar"**, then a command — or tap **Test Mode**.
+7. Say **«هی اینتل تک»** or **"Hey intel tech"**, then a command — or tap **Test Mode**.
 
 ---
 
-# Akbar Assistant (اکبر دستیار)
+# Akbar Assistant (intel tech)
 
 Bilingual Persian + English voice assistant demo — Kotlin + Jetpack Compose.
 
@@ -41,8 +41,8 @@ Bilingual Persian + English voice assistant demo — Kotlin + Jetpack Compose.
 | Permission | `RECORD_AUDIO` |
 
 ## Wake
-- FA: هی اکبر  
-- EN: Hey Akbar  
+- FA: هی اینتل تک  
+- EN: Hey intel tech  
 
 ## Commands
 - **Time** — ساعت چنده؟ / What time is it?
