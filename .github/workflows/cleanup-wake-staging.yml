@@ -1,0 +1,34 @@
+name: Cleanup wake staging
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/cleanup-wake-staging.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cursor/wake-intel-tech-4d15
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Remove staging artifacts
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -rf .github/staging
+          rm -f .github/workflows/restore-wake-files.yml
+          rm -f .github/workflows/cleanup-wake-staging.yml
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to clean"
+          else
+            git commit -m "chore: remove wake-word staging artifacts"
+            git push origin HEAD:cursor/wake-intel-tech-4d15
+          fi
